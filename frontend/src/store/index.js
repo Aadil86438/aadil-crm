@@ -18,7 +18,6 @@ export default new Vuex.Store({
         user: state => state.user,
         isAuthenticated: state => !!state.token,
         isAdmin: state => state.user && state.user.role === 'admin',
-        isManager: state => state.user && ['admin', 'manager'].includes(state.user.role),
       },
       mutations: {
         SET_AUTH(state, { token, user }) {

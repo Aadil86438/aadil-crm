@@ -21,9 +21,12 @@ func Setup(frontendURL string) http.Handler {
 	activityRepo := repositories.NewActivityRepository(database.DB)
 	noteRepo := repositories.NewNoteRepository(database.DB)
 	auditRepo := repositories.NewAuditRepository(database.DB)
+	regRepo := repositories.NewRegistrationRepository(database.DB)
 
 	// Initialize handlers
 	authH := handlers.NewAuthHandler(userRepo, auditRepo)
+	registrationH := handlers.NewRegistrationHandler(regRepo, userRepo)
+	adminPanelH := handlers.NewAdminPanelHandler(regRepo, userRepo)
 	leadH := handlers.NewLeadHandler(leadRepo, contactRepo, accountRepo, dealRepo, auditRepo)
 	contactH := handlers.NewContactHandler(contactRepo, auditRepo)
 	accountH := handlers.NewAccountHandler(accountRepo, auditRepo)
@@ -42,7 +45,7 @@ func Setup(frontendURL string) http.Handler {
 	// Health check (public)
 	mux.HandleFunc("/health", handlers.Health)
 
-	// Auth routes (public)
+	// ─── PUBLIC AUTH ROUTES ───────────────────────────────────────
 	mux.HandleFunc("/api/auth/login", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
 			http.NotFound(w, r)
@@ -50,8 +53,53 @@ func Setup(frontendURL string) http.Handler {
 		}
 		authH.Login(w, r)
 	})
+	mux.HandleFunc("/api/auth/register", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			http.NotFound(w, r)
+			return
+		}
+		registrationH.Register(w, r)
+	})
+	mux.HandleFunc("/api/auth/submit-payment", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			http.NotFound(w, r)
+			return
+		}
+		registrationH.SubmitPayment(w, r)
+	})
+	mux.HandleFunc("/api/auth/registration-status/", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet {
+			registrationH.CheckStatus(w, r)
+		}
+	})
 
-	// Protected routes - apply auth middleware
+	// ─── ADMIN PANEL ROUTES (code-gated, not JWT) ─────────────────
+	mux.HandleFunc("/api/admin/verify", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			http.NotFound(w, r)
+			return
+		}
+		adminPanelH.VerifyCode(w, r)
+	})
+	// Admin-panel protected routes use JWT token from VerifyCode
+	adminAuth := middleware.Auth
+	mux.Handle("/api/admin/pending", adminAuth(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet {
+			adminPanelH.ListPending(w, r)
+		}
+	})))
+	mux.Handle("/api/admin/approve/", adminAuth(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodPost {
+			adminPanelH.Approve(w, r)
+		}
+	})))
+	mux.Handle("/api/admin/reject/", adminAuth(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodPost {
+			adminPanelH.Reject(w, r)
+		}
+	})))
+
+	// ─── PROTECTED CRM ROUTES ─────────────────────────────────────
 	auth := middleware.Auth
 
 	// Auth - protected
@@ -241,18 +289,18 @@ func Setup(frontendURL string) http.Handler {
 		}
 	})))
 
-	// Users - admin only
+	// Users - all authenticated users can list, but only admin can create/edit/delete
 	mux.Handle("/api/users/simple", auth(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		userH.ListSimple(w, r)
 	})))
-	mux.Handle("/api/users", auth(middleware.RequireManagerOrAdmin(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	mux.Handle("/api/users", auth(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
 		case http.MethodGet:
 			userH.List(w, r)
 		case http.MethodPost:
 			middleware.RequireAdmin(http.HandlerFunc(userH.Create)).ServeHTTP(w, r)
 		}
-	}))))
+	})))
 	mux.Handle("/api/users/", auth(middleware.RequireAdmin(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		path := r.URL.Path
 		if hasPathSuffix(path, "/password") {

@@ -14,8 +14,8 @@
     >
       <!-- Logo -->
       <div class="sidebar-logo d-flex align-center pa-4" :class="miniVariant && !$vuetify.breakpoint.mobile ? 'justify-center' : ''">
-        <v-icon color="white" size="28" class="mr-2" :class="miniVariant && !$vuetify.breakpoint.mobile ? 'mr-0' : ''">mdi-handshake</v-icon>
-        <span v-if="!miniVariant || $vuetify.breakpoint.mobile" class="white--text text-h6 font-weight-bold">CRM</span>
+        <v-icon color="white" size="28" class="mr-2" :class="miniVariant && !$vuetify.breakpoint.mobile ? 'mr-0' : ''">mdi-home-city</v-icon>
+        <span v-if="!miniVariant || $vuetify.breakpoint.mobile" class="white--text text-h6 font-weight-bold">Propertier</span>
         <v-spacer v-if="!miniVariant || $vuetify.breakpoint.mobile" />
         <v-btn icon small @click="miniVariant = !miniVariant" v-if="!$vuetify.breakpoint.mobile">
           <v-icon color="white" small>{{ miniVariant ? 'mdi-chevron-right' : 'mdi-chevron-left' }}</v-icon>
@@ -33,8 +33,8 @@
           exact-path
           active-class="sidebar-active"
           class="sidebar-item mb-1"
-          :disabled="item.adminOnly && !isAdmin"
-          v-show="!item.adminOnly || isAdmin"
+          :disabled="item.hidden && !isAdmin"
+          v-show="!item.hidden || isAdmin"
         >
           <v-list-item-icon class="mr-3">
             <v-icon size="20">{{ item.icon }}</v-icon>
@@ -204,13 +204,13 @@ export default {
         { title: 'Activities', icon: 'mdi-timeline', to: '/activities' },
         { title: 'Calendar', icon: 'mdi-calendar', to: '/calendar' },
         { title: 'Reports', icon: 'mdi-chart-bar', to: '/reports' },
-        { title: 'Users', icon: 'mdi-account-group', to: '/users', adminOnly: false },
-        { title: 'Audit Log', icon: 'mdi-shield-check', to: '/audit-log', adminOnly: true },
+        { title: 'Users', icon: 'mdi-account-group', to: '/users' },
+        { title: 'Audit Log', icon: 'mdi-shield-check', to: '/audit-log', hidden: true },
       ]
     }
   },
   computed: {
-    ...mapGetters('auth', ['user', 'isAdmin', 'isAuthenticated']),
+    ...mapGetters('auth', ['user', 'isAdmin']),
     currentUser() {
       return this.user || { name: 'User', email: '', role: '' }
     },
@@ -219,8 +219,8 @@ export default {
       return this.currentUser.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
     },
     roleLabel() {
-      const map = { admin: 'Administrator', manager: 'Manager', sales_user: 'Sales Rep' }
-      return map[this.currentUser.role] || this.currentUser.role
+      const map = { admin: 'Admin', manager: 'Manager', sales_user: 'Team Member' }
+      return map[this.currentUser.role] || 'User'
     },
     filteredResults() {
       if (!this.searchResults) return {}

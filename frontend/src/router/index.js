@@ -6,9 +6,33 @@ Vue.use(VueRouter)
 
 const routes = [
   {
+    path: '/register',
+    name: 'Register',
+    component: () => import('../views/auth/Register.vue'),
+    meta: { public: true }
+  },
+  {
     path: '/login',
     name: 'Login',
     component: () => import('../views/auth/Login.vue'),
+    meta: { public: true }
+  },
+  {
+    path: '/payment/:id',
+    name: 'Payment',
+    component: () => import('../views/auth/Payment.vue'),
+    meta: { public: true }
+  },
+  {
+    path: '/pending/:id',
+    name: 'PendingApproval',
+    component: () => import('../views/auth/PendingApproval.vue'),
+    meta: { public: true }
+  },
+  {
+    path: '/admin-panel',
+    name: 'AdminPanel',
+    component: () => import('../views/auth/AdminPanel.vue'),
     meta: { public: true }
   },
   {
@@ -16,7 +40,8 @@ const routes = [
     component: () => import('../layouts/MainLayout.vue'),
     meta: { requiresAuth: true },
     children: [
-      { path: '', name: 'Dashboard', component: () => import('../views/Dashboard.vue') },
+      { path: '', redirect: 'dashboard' },
+      { path: 'dashboard', name: 'Dashboard', component: () => import('../views/Dashboard.vue') },
       { path: 'leads', name: 'Leads', component: () => import('../views/leads/LeadList.vue') },
       { path: 'leads/new', name: 'LeadCreate', component: () => import('../views/leads/LeadForm.vue') },
       { path: 'leads/:id', name: 'LeadDetail', component: () => import('../views/leads/LeadDetail.vue') },
@@ -40,11 +65,11 @@ const routes = [
       { path: 'calendar', name: 'Calendar', component: () => import('../views/calendar/CalendarView.vue') },
       { path: 'reports', name: 'Reports', component: () => import('../views/reports/Reports.vue') },
       { path: 'search', name: 'Search', component: () => import('../views/search/SearchResults.vue') },
-      { path: 'users', name: 'Users', component: () => import('../views/users/UserList.vue'), meta: { requiresManager: true } },
+      { path: 'users', name: 'Users', component: () => import('../views/users/UserList.vue') },
       { path: 'audit-log', name: 'AuditLog', component: () => import('../views/admin/AuditLog.vue'), meta: { requiresAdmin: true } },
     ]
   },
-  { path: '*', redirect: '/' }
+  { path: '*', redirect: '/register' }
 ]
 
 const router = new VueRouter({
@@ -59,25 +84,20 @@ const router = new VueRouter({
 router.beforeEach((to, from, next) => {
   const isAuthenticated = store.getters['auth/isAuthenticated']
   const isAdmin = store.getters['auth/isAdmin']
-  const isManager = store.getters['auth/isManager']
 
   if (to.meta.public) {
-    if (isAuthenticated && to.path === '/login') {
-      return next('/')
+    if (isAuthenticated && (to.path === '/login' || to.path === '/register')) {
+      return next('/dashboard')
     }
     return next()
   }
 
-  if (to.meta.requiresAuth && !isAuthenticated) {
-    return next('/login')
+  if (to.matched.some(record => record.meta.requiresAuth) && !isAuthenticated) {
+    return next('/register')
   }
 
   if (to.meta.requiresAdmin && !isAdmin) {
-    return next('/')
-  }
-
-  if (to.meta.requiresManager && !isManager) {
-    return next('/')
+    return next('/dashboard')
   }
 
   next()
