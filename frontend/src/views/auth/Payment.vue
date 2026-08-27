@@ -241,8 +241,8 @@ export default {
   border: 2px dashed #F59E0B;
 }
 .qr-wrapper {
-  width: 200px;
-  height: 200px;
+  max-width: 320px;
+  width: 100%;
   background: white;
   border-radius: 12px;
   padding: 8px;
@@ -250,8 +250,8 @@ export default {
 }
 .qr-image {
   width: 100%;
-  height: 100%;
-  object-fit: contain;
+  height: auto;
+  display: block;
   border-radius: 8px;
 }
 .submit-btn {
