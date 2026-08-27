@@ -6,17 +6,15 @@ services:
     container_name: crm_postgres
     restart: unless-stopped
     environment:
-      POSTGRES_DB: crm
-      POSTGRES_USER: crm_user
-      POSTGRES_PASSWORD: "2466"
-    ports:
-      - "5432:5432"
+      POSTGRES_DB: ${POSTGRES_DB:-crm}
+      POSTGRES_USER: ${POSTGRES_USER:-crm_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     volumes:
       - pgdata:/var/lib/postgresql/data
     networks:
       - crm_net
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U crm_user -d crm"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-crm_user} -d ${POSTGRES_DB:-crm}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -31,18 +29,16 @@ services:
       postgres:
         condition: service_healthy
     environment:
-      APP_ENV: production
-      PORT: 8080
-      DB_HOST: postgres
-      DB_PORT: 5432
-      DB_NAME: crm
-      DB_USER: crm_user
-      DB_PASSWORD: "2466"
-      JWT_SECRET: "${JWT_SECRET:-change_me_in_production}"
-      JWT_EXPIRATION: 24h
-      FRONTEND_URL: "http://localhost:8081"
-    ports:
-      - "8080:8080"
+      APP_ENV: ${APP_ENV:-production}
+      PORT: ${PORT:-8080}
+      DB_HOST: ${DB_HOST:-postgres}
+      DB_PORT: ${DB_PORT:-5432}
+      DB_NAME: ${DB_NAME:-crm}
+      DB_USER: ${DB_USER:-crm_user}
+      DB_PASSWORD: ${DB_PASSWORD}
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_EXPIRATION: ${JWT_EXPIRATION:-24h}
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost}
     networks:
       - crm_net
 
@@ -55,9 +51,9 @@ services:
     depends_on:
       - backend
     environment:
-      VUE_APP_API_URL: "http://localhost:8080"
+      VUE_APP_API_URL: ${VUE_APP_API_URL:-/}
     ports:
-      - "8081:80"
+      - "80:80"
     networks:
       - crm_net
 
@@ -67,3 +63,4 @@ volumes:
 networks:
   crm_net:
     driver: bridge
+

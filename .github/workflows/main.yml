@@ -1,0 +1,45 @@
+name: Deploy CRM to EC2
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Deploy to EC2 via SSH
+        uses: appleboy/ssh-action@v1.2.2
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            set -e
+
+            if [ ! -d "/home/ubuntu/aadil-crm/.git" ]; then
+              echo "Repository not found on EC2. Cloning..."
+              git clone https://github.com/Aadil86438/aadil-crm.git /home/ubuntu/aadil-crm
+            else
+              echo "Repository found. Pulling latest main branch..."
+              cd /home/ubuntu/aadil-crm
+              git fetch origin
+              git reset --hard origin/main
+            fi
+
+            cd /home/ubuntu/aadil-crm
+
+            if [ ! -f ".env" ]; then
+              echo "ERROR: .env file missing in /home/ubuntu/aadil-crm!"
+              echo "Please create .env with required secrets before deploying."
+              exit 1
+            fi
+
+            echo "Rebuilding and restarting Docker containers..."
+            docker compose down
+            docker compose up -d --build
+
+            echo "Checking running containers..."
+            docker compose ps
