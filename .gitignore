@@ -1,0 +1,37 @@
+# Environment files
+.env
+.env.local
+.env.production
+
+# Go
+backend/bin/
+backend/*.exe
+backend/vendor/
+
+# Node / npm
+frontend/node_modules/
+frontend/dist/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Database dumps
+*.sql.gz
+*.dump
+
+# Docker volumes (local dev)
+.docker/
+
+# Build artifacts
+*.out
