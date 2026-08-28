@@ -103,6 +103,16 @@ func Setup(frontendURL string) http.Handler {
 			adminPanelH.Reject(w, r)
 		}
 	})))
+	mux.Handle("/api/admin/redis", adminAuth(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodGet:
+			adminPanelH.GetRedisData(w, r)
+		case http.MethodDelete:
+			adminPanelH.DeleteRedisKey(w, r)
+		default:
+			http.NotFound(w, r)
+		}
+	})))
 
 	// ─── PROTECTED CRM ROUTES ─────────────────────────────────────
 	auth := middleware.Auth

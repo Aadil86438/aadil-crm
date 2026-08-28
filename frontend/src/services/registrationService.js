@@ -29,5 +29,15 @@ export default {
     return axios.post(`${baseURL}/api/admin/reject/${id}`, {}, {
       headers: { Authorization: `Bearer ${token}` }
     })
+  },
+  getRedisData(token) {
+    return axios.get(`${baseURL}/api/admin/redis`, {
+      headers: { Authorization: `Bearer ${token}` }
+    })
+  },
+  deleteRedisKey(key, token) {
+    return axios.delete(`${baseURL}/api/admin/redis?key=${encodeURIComponent(key)}`, {
+      headers: { Authorization: `Bearer ${token}` }
+    })
   }
 }

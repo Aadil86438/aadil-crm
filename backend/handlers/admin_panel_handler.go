@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 
+	"crm/database"
 	"crm/models"
 	"crm/repositories"
 	"crm/utils"
@@ -141,3 +142,117 @@ func (h *AdminPanelHandler) Reject(w http.ResponseWriter, r *http.Request) {
 		"message": "Registration request rejected.",
 	})
 }
+
+// RedisKeyItem represents a key-value detail in Redis
+type RedisKeyItem struct {
+	Key   string      `json:"key"`
+	Type  string      `json:"type"`
+	TTL   int64       `json:"ttl"`
+	Value interface{} `json:"value"`
+}
+
+// GetRedisData handles GET /api/admin/redis — retrieves Redis status and stored keys
+func (h *AdminPanelHandler) GetRedisData(w http.ResponseWriter, r *http.Request) {
+	if database.RedisClient == nil {
+		utils.Success(w, map[string]interface{}{
+			"connected": false,
+			"message":   "Redis client is not connected",
+			"keys":      []RedisKeyItem{},
+		})
+		return
+	}
+
+	ctx := r.Context()
+
+	// Ping check
+	pingErr := database.RedisClient.Ping(ctx).Err()
+	connected := pingErr == nil
+
+	// Get all keys
+	keys, err := database.RedisClient.Keys(ctx, "*").Result()
+	if err != nil {
+		keys = []string{}
+	}
+
+	items := make([]RedisKeyItem, 0, len(keys))
+	for _, k := range keys {
+		kType, _ := database.RedisClient.Type(ctx, k).Result()
+		ttlDuration, _ := database.RedisClient.TTL(ctx, k).Result()
+
+		var val interface{}
+		switch kType {
+		case "string":
+			v, err := database.RedisClient.Get(ctx, k).Result()
+			if err == nil {
+				// try to decode JSON if possible
+				var decoded interface{}
+				if json.Unmarshal([]byte(v), &decoded) == nil {
+					val = decoded
+				} else {
+					val = v
+				}
+			}
+		case "hash":
+			v, err := database.RedisClient.HGetAll(ctx, k).Result()
+			if err == nil {
+				val = v
+			}
+		case "list":
+			v, err := database.RedisClient.LRange(ctx, k, 0, 50).Result()
+			if err == nil {
+				val = v
+			}
+		case "set":
+			v, err := database.RedisClient.SMembers(ctx, k).Result()
+			if err == nil {
+				val = v
+			}
+		default:
+			val = "(binary/other)"
+		}
+
+		items = append(items, RedisKeyItem{
+			Key:   k,
+			Type:  kType,
+			TTL:   int64(ttlDuration.Seconds()),
+			Value: val,
+		})
+	}
+
+	// Get basic Redis info
+	infoRaw, _ := database.RedisClient.Info(ctx, "server", "memory", "clients").Result()
+
+	utils.Success(w, map[string]interface{}{
+		"connected":  connected,
+		"key_count":  len(keys),
+		"keys":       items,
+		"raw_info":   infoRaw,
+	})
+}
+
+// DeleteRedisKey handles DELETE /api/admin/redis?key=xxx — deletes a key from Redis
+func (h *AdminPanelHandler) DeleteRedisKey(w http.ResponseWriter, r *http.Request) {
+	if database.RedisClient == nil {
+		utils.BadRequest(w, "Redis is not connected")
+		return
+	}
+
+	key := r.URL.Query().Get("key")
+	if key == "" {
+		utils.BadRequest(w, "Key query parameter is required")
+		return
+	}
+
+	ctx := r.Context()
+	err := database.RedisClient.Del(ctx, key).Err()
+	if err != nil {
+		utils.InternalServerError(w, "Failed to delete key: "+err.Error())
+		return
+	}
+
+	utils.Success(w, map[string]string{
+		"message": "Key deleted successfully",
+		"key":     key,
+	})
+}
+
