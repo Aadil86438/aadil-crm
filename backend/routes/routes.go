@@ -88,6 +88,11 @@ func Setup(frontendURL string) http.Handler {
 			adminPanelH.ListPending(w, r)
 		}
 	})))
+	mux.Handle("/api/admin/all", adminAuth(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet {
+			adminPanelH.ListAll(w, r)
+		}
+	})))
 	mux.Handle("/api/admin/approve/", adminAuth(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodPost {
 			adminPanelH.Approve(w, r)

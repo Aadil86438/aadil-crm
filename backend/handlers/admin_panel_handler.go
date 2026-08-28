@@ -62,6 +62,19 @@ func (h *AdminPanelHandler) ListPending(w http.ResponseWriter, r *http.Request) 
 	utils.Success(w, regs)
 }
 
+// ListAll handles GET /api/admin/all
+func (h *AdminPanelHandler) ListAll(w http.ResponseWriter, r *http.Request) {
+	regs, err := h.regRepo.ListAll()
+	if err != nil {
+		utils.InternalServerError(w, "Failed to fetch registration requests")
+		return
+	}
+	if regs == nil {
+		regs = []*models.RegistrationRequest{}
+	}
+	utils.Success(w, regs)
+}
+
 // Approve handles POST /api/admin/approve/:id
 func (h *AdminPanelHandler) Approve(w http.ResponseWriter, r *http.Request) {
 	id := extractID(r.URL.Path, "/api/admin/approve/")

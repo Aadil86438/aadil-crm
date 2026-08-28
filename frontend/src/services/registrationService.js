@@ -15,6 +15,11 @@ export default {
       headers: { Authorization: `Bearer ${token}` }
     })
   },
+  getAll(token) {
+    return axios.get(`${baseURL}/api/admin/all`, {
+      headers: { Authorization: `Bearer ${token}` }
+    })
+  },
   approveRequest(id, token) {
     return axios.post(`${baseURL}/api/admin/approve/${id}`, {}, {
       headers: { Authorization: `Bearer ${token}` }

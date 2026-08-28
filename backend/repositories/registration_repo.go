@@ -103,6 +103,33 @@ func (r *RegistrationRepository) ListPending() ([]*models.RegistrationRequest, e
 	return regs, nil
 }
 
+// ListAll returns all registration requests (pending, approved, rejected)
+func (r *RegistrationRepository) ListAll() ([]*models.RegistrationRequest, error) {
+	rows, err := r.db.Query(`
+		SELECT id, name, email, company_name, transaction_id, payment_status, approval_status, created_at, updated_at
+		FROM registration_requests
+		ORDER BY created_at DESC
+	`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var regs []*models.RegistrationRequest
+	for rows.Next() {
+		reg := &models.RegistrationRequest{}
+		if err := rows.Scan(
+			&reg.ID, &reg.Name, &reg.Email, &reg.CompanyName,
+			&reg.TransactionID, &reg.PaymentStatus, &reg.ApprovalStatus,
+			&reg.CreatedAt, &reg.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		regs = append(regs, reg)
+	}
+	return regs, nil
+}
+
 // Approve marks a registration request as approved
 func (r *RegistrationRepository) Approve(id string) error {
 	_, err := r.db.Exec(`
