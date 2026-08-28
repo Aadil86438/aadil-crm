@@ -81,7 +81,7 @@
           <div class="qr-section text-center pa-4 rounded mb-4">
             <div class="text-body-2 font-weight-medium mb-2 grey--text text--darken-2">Scan & Pay using any UPI app</div>
             <div class="qr-wrapper mx-auto mb-3">
-              <img src="/img/payment-qr.png" alt="Payment QR Code" class="qr-image" />
+              <img src="/img/payment-qr.jpeg" alt="Payment QR Code" class="qr-image" />
             </div>
             <div class="text-body-2 font-weight-bold mb-1">A MOHAMMED AADIL</div>
             <div class="text-caption grey--text">UPI: 8643839796@yapl</div>
