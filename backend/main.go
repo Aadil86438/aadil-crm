@@ -37,6 +37,9 @@ func main() {
 	}
 	defer database.DB.Close()
 
+	// Connect to Redis (optional cache layer)
+	_ = database.InitRedis(cfg.Redis.Host, cfg.Redis.Port, cfg.Redis.Password)
+
 	// Run migrations
 	migrationsPath := filepath.Join(".", "migrations")
 	if err := database.RunMigrations(migrationsPath); err != nil {

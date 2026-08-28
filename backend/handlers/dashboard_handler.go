@@ -1,8 +1,11 @@
 package handlers
 
 import (
+	"encoding/json"
 	"net/http"
+	"time"
 
+	"crm/database"
 	"crm/models"
 	"crm/repositories"
 	"crm/utils"
@@ -39,6 +42,20 @@ func NewDashboardHandler(
 
 // GetStats handles GET /api/dashboard
 func (h *DashboardHandler) GetStats(w http.ResponseWriter, r *http.Request) {
+	cacheKey := "dashboard:stats"
+
+	// 1. Check Redis Cache
+	if database.RedisClient != nil {
+		cachedData, err := database.RedisClient.Get(r.Context(), cacheKey).Result()
+		if err == nil && cachedData != "" {
+			var respMap map[string]interface{}
+			if err := json.Unmarshal([]byte(cachedData), &respMap); err == nil {
+				utils.Success(w, respMap)
+				return
+			}
+		}
+	}
+
 	stats := &models.DashboardStats{}
 
 	// Lead stats
@@ -89,7 +106,7 @@ func (h *DashboardHandler) GetStats(w http.ResponseWriter, r *http.Request) {
 		recentDeals = []*models.Deal{}
 	}
 
-	utils.Success(w, map[string]interface{}{
+	responseData := map[string]interface{}{
 		"stats":              stats,
 		"leads_by_status":    leadsByStatus2,
 		"leads_by_source":    leadsBySource,
@@ -98,5 +115,14 @@ func (h *DashboardHandler) GetStats(w http.ResponseWriter, r *http.Request) {
 		"monthly_revenue":    monthlyRevenue,
 		"recent_leads":       recentLeads,
 		"recent_deals":       recentDeals,
-	})
+	}
+
+	// Save payload into Redis cache for 60 seconds
+	if database.RedisClient != nil {
+		if jsonBytes, err := json.Marshal(responseData); err == nil {
+			database.RedisClient.Set(r.Context(), cacheKey, jsonBytes, 60*time.Second)
+		}
+	}
+
+	utils.Success(w, responseData)
 }

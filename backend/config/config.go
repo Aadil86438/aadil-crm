@@ -13,7 +13,15 @@ type Config struct {
 	Port         string
 	DB           DBConfig
 	JWT          JWTConfig
+	Redis        RedisConfig
 	FrontendURL  string
+}
+
+// RedisConfig holds Redis connection settings
+type RedisConfig struct {
+	Host     string
+	Port     string
+	Password string
 }
 
 // DBConfig holds database configuration
@@ -56,6 +64,11 @@ func Load() *Config {
 		JWT: JWTConfig{
 			Secret:     getEnv("JWT_SECRET", "dev_secret_change_in_production"),
 			Expiration: jwtExp,
+		},
+		Redis: RedisConfig{
+			Host:     getEnv("REDIS_HOST", "localhost"),
+			Port:     getEnv("REDIS_PORT", "6379"),
+			Password: getEnv("REDIS_PASSWORD", ""),
 		},
 		FrontendURL: getEnv("FRONTEND_URL", "http://localhost:8081"),
 	}
