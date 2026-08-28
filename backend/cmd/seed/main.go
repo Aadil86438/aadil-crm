@@ -47,20 +47,20 @@ func main() {
 	salesHash, _ := utils.HashPassword("Sales@123")
 
 	adminUser, err := userRepo.Create(&models.CreateUserRequest{
-		Name: "Mohammed Aadil", Email: "admin@propertier.app", Role: "admin",
+		Name: "Mohammed Aadil", Email: "admin@proprietor.app", Role: "admin",
 	}, adminHash)
 	if err != nil {
-		adminUser, _ = userRepo.FindByEmail("admin@propertier.app")
+		adminUser, _ = userRepo.FindByEmail("admin@proprietor.app")
 		if adminUser != nil {
 			userRepo.UpdatePassword(adminUser.ID, adminHash)
 		}
 	}
 
 	salesUser, err := userRepo.Create(&models.CreateUserRequest{
-		Name: "Sales Rep", Email: "sales@propertier.app", Role: "sales_user",
+		Name: "Sales Rep", Email: "sales@proprietor.app", Role: "sales_user",
 	}, salesHash)
 	if err != nil {
-		salesUser, _ = userRepo.FindByEmail("sales@propertier.app")
+		salesUser, _ = userRepo.FindByEmail("sales@proprietor.app")
 	}
 
 	ownerID1 := adminUser.ID
@@ -157,8 +157,8 @@ func main() {
 	fmt.Println("\n✅ Seed data created successfully!")
 	fmt.Println("\nCREDENTIALS:")
 	fmt.Println("─────────────────────────────────────────")
-	fmt.Println("Admin: admin@propertier.app / Admin@123")
-	fmt.Println("Sales: sales@propertier.app / Sales@123")
+	fmt.Println("Admin: admin@proprietor.app / Admin@123")
+	fmt.Println("Sales: sales@proprietor.app / Sales@123")
 	fmt.Println("─────────────────────────────────────────")
 	fmt.Println("Admin Panel Code: 1101")
 }

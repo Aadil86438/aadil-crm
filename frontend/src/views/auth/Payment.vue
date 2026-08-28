@@ -9,7 +9,7 @@
             <div class="d-flex align-center">
               <v-icon color="white" size="28" class="mr-2">mdi-home-city</v-icon>
               <div>
-                <div class="white--text text-h6 font-weight-bold" style="line-height: 1.2">Propertier</div>
+                <div class="white--text text-h6 font-weight-bold" style="line-height: 1.2">Proprietor</div>
                 <div class="white--text text-caption" style="opacity: 0.7">by MOHAMMED AADIL</div>
               </div>
             </div>

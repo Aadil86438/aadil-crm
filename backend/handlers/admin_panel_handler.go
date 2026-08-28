@@ -37,7 +37,7 @@ func (h *AdminPanelHandler) VerifyCode(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Generate a short-lived token for admin operations
-	token, err := utils.GenerateToken("admin-panel", "admin@propertier.app", "admin", "Admin Panel", 2*60*60*1e9) // 2 hours
+	token, err := utils.GenerateToken("admin-panel", "admin@proprietor.app", "admin", "Admin Panel", 2*60*60*1e9) // 2 hours
 	if err != nil {
 		utils.InternalServerError(w, "Failed to generate session")
 		return

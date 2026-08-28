@@ -35,7 +35,7 @@
 
           <v-alert v-if="status === 'approved'" type="success" text prominent class="mb-4">
             <div class="font-weight-medium">Your account has been activated!</div>
-            <div class="text-caption mt-1">You can now sign in and start using Propertier CRM.</div>
+            <div class="text-caption mt-1">You can now sign in and start using Proprietor CRM.</div>
           </v-alert>
 
           <v-alert v-if="status === 'rejected'" type="error" text prominent class="mb-4">

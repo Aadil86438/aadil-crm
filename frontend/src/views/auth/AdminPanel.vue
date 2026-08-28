@@ -56,7 +56,7 @@
               </v-avatar>
               <div>
                 <div class="d-flex align-center">
-                  <span class="text-h5 font-weight-black text--primary mr-2">Propertier CRM</span>
+                  <span class="text-h5 font-weight-black text--primary mr-2">Proprietor CRM</span>
                   <v-chip color="primary" small label class="font-weight-bold">ADMIN CONSOLE</v-chip>
                 </div>
                 <div class="text-body-2 grey--text text--darken-1">Manage all pending, approved, and rejected member registrations</div>

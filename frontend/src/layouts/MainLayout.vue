@@ -15,7 +15,7 @@
       <!-- Logo -->
       <div class="sidebar-logo d-flex align-center pa-4" :class="miniVariant && !$vuetify.breakpoint.mobile ? 'justify-center' : ''">
         <v-icon color="white" size="28" class="mr-2" :class="miniVariant && !$vuetify.breakpoint.mobile ? 'mr-0' : ''">mdi-home-city</v-icon>
-        <span v-if="!miniVariant || $vuetify.breakpoint.mobile" class="white--text text-h6 font-weight-bold">Propertier</span>
+        <span v-if="!miniVariant || $vuetify.breakpoint.mobile" class="white--text text-h6 font-weight-bold">Proprietor</span>
         <v-spacer v-if="!miniVariant || $vuetify.breakpoint.mobile" />
         <v-btn icon small @click="miniVariant = !miniVariant" v-if="!$vuetify.breakpoint.mobile">
           <v-icon color="white" small>{{ miniVariant ? 'mdi-chevron-right' : 'mdi-chevron-left' }}</v-icon>

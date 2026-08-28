@@ -10,7 +10,7 @@
                 <v-icon size="40" color="white">mdi-home-city</v-icon>
               </div>
               <h1 class="white--text text-h5 font-weight-bold">Welcome Back</h1>
-              <p class="white--text text-body-2 mt-1 mb-0 opacity-75">Sign in to your Propertier CRM</p>
+              <p class="white--text text-body-2 mt-1 mb-0 opacity-75">Sign in to your Proprietor CRM</p>
             </div>
 
             <v-card-text class="pa-8 pt-6">

@@ -8,7 +8,7 @@
             <div class="hero-logo mb-6">
               <v-icon size="56" color="white">mdi-home-city</v-icon>
             </div>
-            <h1 class="white--text text-h3 font-weight-black mb-3" style="letter-spacing: -0.5px">Propertier</h1>
+            <h1 class="white--text text-h3 font-weight-black mb-3" style="letter-spacing: -0.5px">Proprietor</h1>
             <p class="white--text text-subtitle-1 mb-1" style="opacity: 0.8">by <strong>MOHAMMED AADIL</strong></p>
             <v-divider dark class="my-5 mx-auto" style="max-width: 60px; opacity: 0.4" />
             <p class="white--text text-body-1" style="opacity: 0.7; max-width: 400px; margin: 0 auto; line-height: 1.7">
@@ -29,7 +29,7 @@
             <!-- Mobile Logo -->
             <div class="d-flex d-md-none align-center justify-center mb-6">
               <v-icon color="primary" size="32" class="mr-2">mdi-home-city</v-icon>
-              <span class="text-h5 font-weight-black primary--text">Propertier</span>
+              <span class="text-h5 font-weight-black primary--text">Proprietor</span>
             </div>
 
             <div class="mb-6">
