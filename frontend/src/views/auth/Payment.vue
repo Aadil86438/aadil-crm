@@ -74,42 +74,22 @@
 
           <v-divider class="my-4" />
 
-          <!-- Payment Method -->
-          <div class="text-overline font-weight-bold grey--text text--darken-1 mb-3">PAYMENT METHOD — UPI</div>
+          <!-- Payment Methods -->
+          <div class="text-overline font-weight-bold grey--text text--darken-1 mb-3">PAYMENT METHOD</div>
 
-          <!-- QR Code -->
-          <div class="qr-section text-center pa-4 rounded mb-4">
-            <div class="text-body-2 font-weight-medium mb-2 grey--text text--darken-2">Scan & Pay using any UPI app</div>
-            <div class="qr-wrapper mx-auto mb-3">
-              <img src="/img/payment-qr.jpeg" alt="Payment QR Code" class="qr-image" />
-            </div>
-            <div class="text-body-2 font-weight-bold mb-1">A MOHAMMED AADIL</div>
-            <div class="text-caption grey--text">UPI: 8643839796@yapl</div>
-            <div class="d-flex justify-center mt-3" style="gap: 8px">
-              <v-chip x-small outlined>GPay</v-chip>
-              <v-chip x-small outlined>PhonePe</v-chip>
-              <v-chip x-small outlined>Paytm</v-chip>
-              <v-chip x-small outlined>BHIM</v-chip>
+          <!-- Razorpay Secure Payment -->
+          <div class="razorpay-section text-center pa-4 rounded mb-4">
+            <v-icon color="primary" size="40" class="mb-2">mdi-shield-check</v-icon>
+            <div class="text-body-1 font-weight-bold mb-1">Secure Razorpay Checkout</div>
+            <div class="text-caption grey--text mb-3">Pay securely via UPI, Google Pay, PhonePe, Credit/Debit Card, or Net Banking</div>
+            <div class="d-flex justify-center" style="gap: 8px">
+              <v-chip x-small outlined color="primary">Google Pay</v-chip>
+              <v-chip x-small outlined color="primary">PhonePe</v-chip>
+              <v-chip x-small outlined color="primary">UPI</v-chip>
+              <v-chip x-small outlined color="primary">Cards</v-chip>
+              <v-chip x-small outlined color="primary">NetBanking</v-chip>
             </div>
           </div>
-
-          <!-- Transaction ID Input -->
-          <v-text-field
-            v-model="transactionId"
-            label="Transaction / UTR ID"
-            placeholder="Enter your UPI transaction ID"
-            prepend-inner-icon="mdi-receipt-text-outline"
-            outlined dense color="primary"
-            :rules="[v => !!v || 'Transaction ID is required']"
-            class="mb-2" id="transaction-id"
-          />
-
-          <v-checkbox
-            v-model="confirmed"
-            label="I confirm that I have made the payment of ₹499"
-            color="primary" dense hide-details
-            class="mb-4 mt-0" id="confirm-payment"
-          />
 
           <v-alert v-if="error" type="error" dense text class="mb-3">{{ error }}</v-alert>
           <v-alert v-if="success" type="success" dense text class="mb-3">{{ success }}</v-alert>
@@ -117,13 +97,20 @@
           <v-btn
             color="primary" block large
             :loading="loading"
-            :disabled="!transactionId || !confirmed || loading"
-            @click="submitPayment"
-            class="submit-btn" id="submit-payment"
+            :disabled="loading"
+            @click="initiatePayment"
+            class="submit-btn" id="pay-razorpay"
           >
-            <v-icon left>mdi-check-circle</v-icon>
-            I Have Paid — Submit for Verification
+            <v-icon left>mdi-flash</v-icon>
+            Pay ₹499 via Razorpay
           </v-btn>
+
+          <div class="text-center mt-3">
+            <div class="d-flex align-center justify-center" style="gap: 6px">
+              <v-icon x-small color="success">mdi-lock</v-icon>
+              <span class="text-caption grey--text">256-bit SSL Encrypted • PCI DSS Compliant</span>
+            </div>
+          </div>
 
           <div class="text-center mt-4">
             <v-btn text small color="grey" @click="$router.push('/register')">
@@ -144,8 +131,6 @@ export default {
   name: 'PaymentView',
   data() {
     return {
-      transactionId: '',
-      confirmed: false,
       loading: false,
       error: null,
       success: null,
@@ -178,24 +163,79 @@ export default {
     }
   },
   methods: {
-    async submitPayment() {
-      if (!this.transactionId || !this.confirmed) return
+    async initiatePayment() {
       this.loading = true
       this.error = null
       this.success = null
+
       try {
-        await registrationService.submitPayment({
-          registration_id: this.registrationId,
-          transaction_id: this.transactionId
+        // Step 1: Create Razorpay Order on backend
+        const { data } = await registrationService.createPaymentOrder({
+          registration_id: this.registrationId
         })
-        this.success = 'Payment submitted! Redirecting...'
+
+        const orderData = data.data
+
+        // Step 2: Open Razorpay Checkout popup
+        const options = {
+          key: orderData.razorpay_key_id,
+          amount: orderData.amount,
+          currency: orderData.currency,
+          name: 'Proprietor by MOHAMMED AADIL',
+          description: 'CRM Pro License — ₹499',
+          order_id: orderData.order_id,
+          prefill: {
+            name: orderData.prefill?.name || this.customerName,
+            email: orderData.prefill?.email || '',
+          },
+          theme: {
+            color: '#1565C0'
+          },
+          handler: async (response) => {
+            // Step 3: Verify payment on backend
+            await this.verifyPayment(response)
+          },
+          modal: {
+            ondismiss: () => {
+              this.loading = false
+              this.error = 'Payment was cancelled. Please try again.'
+            }
+          }
+        }
+
+        // eslint-disable-next-line no-undef
+        const rzp = new Razorpay(options)
+        rzp.on('payment.failed', (response) => {
+          this.loading = false
+          this.error = response.error?.description || 'Payment failed. Please try again.'
+        })
+        rzp.open()
+
+      } catch (err) {
+        this.loading = false
+        this.error = err.response?.data?.message || 'Failed to initiate payment. Please try again.'
+      }
+    },
+
+    async verifyPayment(razorpayResponse) {
+      try {
+        await registrationService.verifyPayment({
+          registration_id: this.registrationId,
+          razorpay_order_id: razorpayResponse.razorpay_order_id,
+          razorpay_payment_id: razorpayResponse.razorpay_payment_id,
+          razorpay_signature: razorpayResponse.razorpay_signature
+        })
+
+        this.success = 'Payment verified successfully! Redirecting...'
+        this.loading = false
+
         setTimeout(() => {
           this.$router.push({ name: 'PendingApproval', params: { id: this.registrationId } })
         }, 1500)
+
       } catch (err) {
-        this.error = err.response?.data?.message || 'Failed to submit payment. Please try again.'
-      } finally {
         this.loading = false
+        this.error = err.response?.data?.message || 'Payment verification failed. Contact support.'
       }
     }
   },
@@ -236,28 +276,16 @@ export default {
   padding: 16px;
   border: 1px solid #E2E8F0;
 }
-.qr-section {
-  background: linear-gradient(135deg, #FFF9E6, #FFF3CD);
-  border: 2px dashed #F59E0B;
-}
-.qr-wrapper {
-  max-width: 320px;
-  width: 100%;
-  background: white;
+.razorpay-section {
+  background: linear-gradient(135deg, #EFF6FF, #DBEAFE);
+  border: 2px solid #93C5FD;
   border-radius: 12px;
-  padding: 8px;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-}
-.qr-image {
-  width: 100%;
-  height: auto;
-  display: block;
-  border-radius: 8px;
 }
 .submit-btn {
   font-weight: 600;
   letter-spacing: 0.3px;
   border-radius: 10px !important;
   text-transform: none;
+  font-size: 16px !important;
 }
 </style>

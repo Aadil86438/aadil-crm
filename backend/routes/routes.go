@@ -42,6 +42,7 @@ func Setup(cfg *config.Config) http.Handler {
 	userH := handlers.NewUserHandler(userRepo, accountRepo, contactRepo, auditRepo)
 	auditH := handlers.NewAuditHandler(auditRepo)
 	healthReportH := handlers.NewHealthReportHandler(cfg)
+	paymentH := handlers.NewPaymentHandler(cfg, regRepo)
 
 	mux := http.NewServeMux()
 
@@ -73,6 +74,27 @@ func Setup(cfg *config.Config) http.Handler {
 	mux.HandleFunc("/api/auth/registration-status/", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodGet {
 			registrationH.CheckStatus(w, r)
+		}
+	})
+
+	// ─── PUBLIC PAYMENT ROUTES (Razorpay) ─────────────────────────
+	mux.HandleFunc("/api/payment/create-order", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			http.NotFound(w, r)
+			return
+		}
+		paymentH.CreateOrder(w, r)
+	})
+	mux.HandleFunc("/api/payment/verify", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			http.NotFound(w, r)
+			return
+		}
+		paymentH.VerifyPayment(w, r)
+	})
+	mux.HandleFunc("/api/payment/key", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet {
+			paymentH.GetRazorpayKey(w, r)
 		}
 	})
 

@@ -7,6 +7,11 @@ export default {
   register(data) { return api.post('/api/auth/register', data) },
   submitPayment(data) { return api.post('/api/auth/submit-payment', data) },
   checkStatus(id) { return api.get(`/api/auth/registration-status/${id}`) },
+
+  // Razorpay payment gateway endpoints
+  createPaymentOrder(data) { return api.post('/api/payment/create-order', data) },
+  verifyPayment(data) { return api.post('/api/payment/verify', data) },
+  getRazorpayKey() { return api.get('/api/payment/key') },
   
   // Admin panel endpoints (uses admin token, not user token)
   verifyAdminCode(code) { return api.post('/api/admin/verify', { code }) },
