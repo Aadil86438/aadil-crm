@@ -3,6 +3,7 @@ package routes
 import (
 	"net/http"
 
+	"crm/config"
 	"crm/database"
 	"crm/handlers"
 	"crm/middleware"
@@ -10,7 +11,8 @@ import (
 )
 
 // Setup configures all application routes and returns the main http.Handler
-func Setup(frontendURL string) http.Handler {
+func Setup(cfg *config.Config) http.Handler {
+	frontendURL := cfg.FrontendURL
 	// Initialize repositories
 	userRepo := repositories.NewUserRepository(database.DB)
 	leadRepo := repositories.NewLeadRepository(database.DB)
@@ -39,6 +41,7 @@ func Setup(frontendURL string) http.Handler {
 	reportH := handlers.NewReportHandler(leadRepo, dealRepo, activityRepo)
 	userH := handlers.NewUserHandler(userRepo, accountRepo, contactRepo, auditRepo)
 	auditH := handlers.NewAuditHandler(auditRepo)
+	healthReportH := handlers.NewHealthReportHandler(cfg)
 
 	mux := http.NewServeMux()
 
@@ -110,6 +113,20 @@ func Setup(frontendURL string) http.Handler {
 		case http.MethodDelete:
 			adminPanelH.DeleteRedisKey(w, r)
 		default:
+			http.NotFound(w, r)
+		}
+	})))
+	mux.Handle("/api/admin/health-report", adminAuth(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet {
+			healthReportH.GetHealthStatus(w, r)
+		} else {
+			http.NotFound(w, r)
+		}
+	})))
+	mux.Handle("/api/admin/health-report/trigger", adminAuth(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodPost {
+			healthReportH.TriggerHealthReport(w, r)
+		} else {
 			http.NotFound(w, r)
 		}
 	})))

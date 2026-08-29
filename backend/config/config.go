@@ -7,6 +7,22 @@ import (
 	"time"
 )
 
+// SMTPConfig holds email dispatch settings
+type SMTPConfig struct {
+	Host     string
+	Port     int
+	Username string
+	Password string
+	From     string
+}
+
+// HealthReportConfig holds configuration for the daily health report
+type HealthReportConfig struct {
+	Enabled   bool
+	Recipient string
+	Time      string // Format "15:04" e.g., "21:00"
+}
+
 // Config holds all application configuration
 type Config struct {
 	AppEnv       string
@@ -15,6 +31,8 @@ type Config struct {
 	JWT          JWTConfig
 	Redis        RedisConfig
 	FrontendURL  string
+	SMTP         SMTPConfig
+	HealthReport HealthReportConfig
 }
 
 // RedisConfig holds Redis connection settings
@@ -51,6 +69,9 @@ func Load() *Config {
 		log.Fatal("Invalid JWT_EXPIRATION:", err)
 	}
 
+	smtpPort, _ := strconv.Atoi(getEnv("SMTP_PORT", "587"))
+	reportEnabled, _ := strconv.ParseBool(getEnv("ENABLE_DAILY_HEALTH_REPORT", "true"))
+
 	return &Config{
 		AppEnv: getEnv("APP_ENV", "development"),
 		Port:   getEnv("PORT", "8080"),
@@ -71,6 +92,18 @@ func Load() *Config {
 			Password: getEnv("REDIS_PASSWORD", ""),
 		},
 		FrontendURL: getEnv("FRONTEND_URL", "http://localhost:8081"),
+		SMTP: SMTPConfig{
+			Host:     getEnv("SMTP_HOST", "smtp.gmail.com"),
+			Port:     smtpPort,
+			Username: getEnv("SMTP_USERNAME", ""),
+			Password: getEnv("SMTP_PASSWORD", ""),
+			From:     getEnv("SMTP_FROM", ""),
+		},
+		HealthReport: HealthReportConfig{
+			Enabled:   reportEnabled,
+			Recipient: getEnv("HEALTH_REPORT_TO", ""),
+			Time:      getEnv("HEALTH_REPORT_TIME", "21:00"),
+		},
 	}
 }
 

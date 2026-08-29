@@ -41,6 +41,14 @@ services:
       FRONTEND_URL: ${FRONTEND_URL:-http://localhost}
       REDIS_HOST: ${REDIS_HOST:-redis}
       REDIS_PORT: ${REDIS_PORT:-6379}
+      SMTP_HOST: ${SMTP_HOST:-smtp.gmail.com}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USERNAME: ${SMTP_USERNAME:-mraadildesktop@gmail.com}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-acgkzlgmdcnfaadq}
+      SMTP_FROM: ${SMTP_FROM:-mraadildesktop@gmail.com}
+      HEALTH_REPORT_TO: ${HEALTH_REPORT_TO:-mraadildesktop@gmail.com}
+      HEALTH_REPORT_TIME: ${HEALTH_REPORT_TIME:-21:00}
+      ENABLE_DAILY_HEALTH_REPORT: ${ENABLE_DAILY_HEALTH_REPORT:-true}
     networks:
       - crm_net
 

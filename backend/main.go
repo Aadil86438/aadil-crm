@@ -14,6 +14,7 @@ import (
 	"crm/config"
 	"crm/database"
 	"crm/routes"
+	"crm/services"
 	"crm/utils"
 
 	"github.com/joho/godotenv"
@@ -46,8 +47,11 @@ func main() {
 		log.Fatalf("Failed to run migrations: %v", err)
 	}
 
+	// Start Daily Health Report Scheduler Goroutine
+	services.StartDailyHealthReport(cfg)
+
 	// Setup routes
-	handler := routes.Setup(cfg.FrontendURL)
+	handler := routes.Setup(cfg)
 
 	// Configure server
 	addr := fmt.Sprintf(":%s", cfg.Port)
