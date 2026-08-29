@@ -48,6 +48,9 @@ func Setup(cfg *config.Config) http.Handler {
 
 	// Health check (public)
 	mux.HandleFunc("/health", handlers.Health)
+	mux.HandleFunc("/api/health-report/test-email", func(w http.ResponseWriter, r *http.Request) {
+		healthReportH.TriggerHealthReport(w, r)
+	})
 
 	// ─── PUBLIC AUTH ROUTES ───────────────────────────────────────
 	mux.HandleFunc("/api/auth/login", func(w http.ResponseWriter, r *http.Request) {
