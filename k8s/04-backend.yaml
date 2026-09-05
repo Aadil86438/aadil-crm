@@ -1,0 +1,67 @@
+# ==============================================================================
+# KUBERNETES MANIFEST 4: GO BACKEND APPLICATION
+# ==============================================================================
+
+# ------------------------------------------------------------------------------
+# 1. DEPLOYMENT: Manages Go Backend Pods with Auto-Healing & Probes
+# ------------------------------------------------------------------------------
+apiVersion: apps/v1           # K8s API version for workloads
+kind: Deployment              # Resource type: Deployment
+metadata:
+  name: backend-deployment    # Unique name for this deployment
+  labels:
+    app: crm-backend          # Label for identification
+spec:
+  replicas: 2                 # Desired state: Run 2 identical copies of Go Backend!
+  selector:
+    matchLabels:
+      app: crm-backend        # Selector to target pods with label app=crm-backend
+  template:
+    metadata:
+      labels:
+        app: crm-backend      # Tag label assigned to each generated Pod
+    spec:
+      containers:
+        - name: crm-backend   # Container name inside the pod
+          image: crm-backend:latest # Local Docker image built from /backend
+          imagePullPolicy: IfNotPresent # Use local image if available
+          ports:
+            - containerPort: 8080 # Go application HTTP listening port
+          envFrom:
+            - configMapRef:
+                name: crm-config   # Inject all variables from ConfigMap
+            - secretRef:
+                name: crm-secrets  # Inject all secrets (passwords, keys)
+          
+          # LIVENESS PROBE: K8s checks if app is alive. If this fails, K8s RESTARTS the pod!
+          livenessProbe:
+            httpGet:
+              path: /health # Correct healthcheck HTTP endpoint in Go app
+              port: 8080
+            initialDelaySeconds: 15 # Wait 15s after container boots before first probe
+            periodSeconds: 10       # Re-check every 10 seconds
+
+          # READINESS PROBE: K8s checks if app can accept traffic. If failing, traffic is paused.
+          readinessProbe:
+            httpGet:
+              path: /health # Correct healthcheck HTTP endpoint in Go app
+              port: 8080
+            initialDelaySeconds: 5  # Wait 5s before checking readiness
+            periodSeconds: 5        # Re-check every 5 seconds
+
+---
+
+# ------------------------------------------------------------------------------
+# 2. SERVICE: Internal Load Balancer across the 2 Go Backend Pods
+# ------------------------------------------------------------------------------
+apiVersion: v1                # K8s API version for networking
+kind: Service                 # Resource type: Service
+metadata:
+  name: backend-service       # Internal DNS Hostname created: "backend-service"
+spec:
+  selector:
+    app: crm-backend          # Directs incoming requests evenly to both Go backend pods
+  ports:
+    - port: 8080              # Service port
+      targetPort: 8080        # Container target port
+  type: ClusterIP             # Internal private load balancer

@@ -1,0 +1,84 @@
+# ==============================================================================
+# KUBERNETES MANIFEST 2: POSTGRESQL DATABASE & STORAGE
+# ==============================================================================
+
+# ------------------------------------------------------------------------------
+# 1. PERSISTENT VOLUME CLAIM (PVC): Requests virtual disk storage for database
+# ------------------------------------------------------------------------------
+apiVersion: v1                # K8s API version for storage resources
+kind: PersistentVolumeClaim   # Resource type: PVC (Virtual Hard Drive request)
+metadata:
+  name: postgres-pvc          # Unique name for this storage claim
+spec:
+  accessModes:
+    - ReadWriteOnce           # Disk can be mounted as read-write by 1 Node at a time
+  resources:
+    requests:
+      storage: 2Gi            # Requests 2 Gigabytes of persistent storage space
+
+---
+
+# ------------------------------------------------------------------------------
+# 2. DEPLOYMENT: Manages the PostgreSQL container & guarantees it stays running
+# ------------------------------------------------------------------------------
+apiVersion: apps/v1           # K8s API version for workload resources
+kind: Deployment              # Resource type: Deployment
+metadata:
+  name: postgres-deployment   # Name of this deployment
+  labels:
+    app: postgres             # Tag label applied to this deployment
+spec:
+  replicas: 1                 # Desired state: Keep exactly 1 Postgres Pod running
+  selector:
+    matchLabels:
+      app: postgres           # Label selector: Controller manages pods tagged app=postgres
+  template:
+    metadata:
+      labels:
+        app: postgres         # Label assigned to the Pod created by this blueprint
+    spec:
+      containers:
+        - name: postgres      # Name of the container inside the pod
+          image: postgres:15-alpine # Official Docker Hub Postgres image
+          ports:
+            - containerPort: 5432   # Port exposed inside the container
+          env:                # Injecting environment variables from ConfigMap & Secret
+            - name: POSTGRES_DB
+              valueFrom:
+                configMapKeyRef:
+                  name: crm-config   # Read DB name from crm-config ConfigMap
+                  key: POSTGRES_DB
+            - name: POSTGRES_USER
+              valueFrom:
+                configMapKeyRef:
+                  name: crm-config   # Read DB user from crm-config ConfigMap
+                  key: POSTGRES_USER
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: crm-secrets  # Read DB password securely from crm-secrets Secret
+                  key: POSTGRES_PASSWORD
+          volumeMounts:       # Mount the persistent disk inside the container
+            - name: postgres-data    # Name of volume defined below
+              mountPath: /var/lib/postgresql/data # Directory where Postgres saves DB files
+      volumes:                # Attach the PVC storage disk defined above to this pod
+        - name: postgres-data
+          persistentVolumeClaim:
+            claimName: postgres-pvc  # Binds to postgres-pvc disk
+
+---
+
+# ------------------------------------------------------------------------------
+# 3. SERVICE: Exposes PostgreSQL on an internal DNS name inside the cluster
+# ------------------------------------------------------------------------------
+apiVersion: v1                # K8s API version for networking
+kind: Service                 # Resource type: Service (Internal DNS / Load Balancer)
+metadata:
+  name: postgres-service     # DNS Hostname created: "postgres-service"
+spec:
+  selector:
+    app: postgres             # Routes incoming network traffic to pods with label app=postgres
+  ports:
+    - port: 5432              # Port where Service listens
+      targetPort: 5432        # Target port on the Postgres container
+  type: ClusterIP             # Private internal IP (Only accessible within K8s cluster)

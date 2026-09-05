@@ -1,0 +1,38 @@
+# ==============================================================================
+# KUBERNETES MANIFEST 1: CONFIGMAPS & SECRETS
+# ==============================================================================
+# This file defines environment variables used across our Go Backend & Postgres.
+# ConfigMaps hold non-sensitive data, while Secrets hold confidential data.
+# ==============================================================================
+
+# ------------------------------------------------------------------------------
+# 1. SECRET: Stores sensitive credentials securely in Kubernetes
+# ------------------------------------------------------------------------------
+apiVersion: v1                # K8s API version for core resources
+kind: Secret                  # Resource type: Secret
+metadata:
+  name: crm-secrets           # Unique name referenced by our backend pods
+type: Opaque                  # Default secret type (arbitrary key-value pairs)
+stringData:
+  POSTGRES_PASSWORD: "2466" # DB root password (matches Go backend config)
+  JWT_SECRET: "super_secret_jwt_key_998877"   # JWT authentication signing key
+  RAZORPAY_KEY_ID: "rzp_test_sample_id"        # Payment gateway API Key ID
+  RAZORPAY_KEY_SECRET: "rzp_test_sample_secret"# Payment gateway API Secret key
+
+---
+
+# ------------------------------------------------------------------------------
+# 2. CONFIGMAP: Stores non-sensitive application settings
+# ------------------------------------------------------------------------------
+apiVersion: v1                # K8s API version for core resources
+kind: ConfigMap               # Resource type: ConfigMap
+metadata:
+  name: crm-config            # Unique name referenced by our backend pods
+data:
+  POSTGRES_DB: "crm"          # PostgreSQL database name
+  POSTGRES_USER: "crm_user"   # PostgreSQL database username
+  DB_HOST: "postgres-service" # Internal DNS host name of Postgres Service
+  DB_PORT: "5432"             # Internal Postgres network port
+  REDIS_HOST: "redis-service" # Internal DNS host name of Redis Service
+  REDIS_PORT: "6379"             # Internal Redis network port
+  PORT: "8080"                # Go Backend application port

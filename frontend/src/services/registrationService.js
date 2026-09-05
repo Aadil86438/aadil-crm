@@ -44,5 +44,15 @@ export default {
     return axios.delete(`${baseURL}/api/admin/redis?key=${encodeURIComponent(key)}`, {
       headers: { Authorization: `Bearer ${token}` }
     })
+  },
+  getK8sStatus(token) {
+    return axios.get(`${baseURL}/api/admin/k8s/status`, {
+      headers: { Authorization: `Bearer ${token}` }
+    })
+  },
+  killK8sPod(podName, token) {
+    return axios.post(`${baseURL}/api/admin/k8s/kill-pod`, { podName }, {
+      headers: { Authorization: `Bearer ${token}` }
+    })
   }
 }

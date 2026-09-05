@@ -1,0 +1,45 @@
+# ==============================================================================
+# KUBERNETES MANIFEST 3: REDIS IN-MEMORY CACHE
+# ==============================================================================
+
+# ------------------------------------------------------------------------------
+# 1. DEPLOYMENT: Manages the Redis caching container
+# ------------------------------------------------------------------------------
+apiVersion: apps/v1           # K8s API version for workloads
+kind: Deployment              # Resource type: Deployment
+metadata:
+  name: redis-deployment      # Unique name of this deployment
+  labels:
+    app: redis                # Deployment identification label
+spec:
+  replicas: 1                 # Desired state: Keep exactly 1 Redis Pod running
+  selector:
+    matchLabels:
+      app: redis              # Manages pods matching label app=redis
+  template:
+    metadata:
+      labels:
+        app: redis            # Label assigned to the Redis Pod
+    spec:
+      containers:
+        - name: redis         # Container name
+          image: redis:7-alpine # Official Redis image from Docker Hub
+          ports:
+            - containerPort: 6379 # Standard Redis caching network port
+
+---
+
+# ------------------------------------------------------------------------------
+# 2. SERVICE: Exposes Redis internally to the Go Backend
+# ------------------------------------------------------------------------------
+apiVersion: v1                # K8s API version for networking
+kind: Service                 # Resource type: Service
+metadata:
+  name: redis-service        # Internal DNS Hostname created: "redis-service"
+spec:
+  selector:
+    app: redis                # Routes traffic to Redis pods
+  ports:
+    - port: 6379              # Service port
+      targetPort: 6379        # Target container port
+  type: ClusterIP             # Internal private service

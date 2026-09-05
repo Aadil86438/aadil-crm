@@ -1,0 +1,47 @@
+# ==============================================================================
+# KUBERNETES MANIFEST 5: VUE FRONTEND APPLICATION
+# ==============================================================================
+
+# ------------------------------------------------------------------------------
+# 1. DEPLOYMENT: Manages Vue.js Frontend container
+# ------------------------------------------------------------------------------
+apiVersion: apps/v1           # K8s API version for workloads
+kind: Deployment              # Resource type: Deployment
+metadata:
+  name: frontend-deployment   # Name of frontend deployment
+  labels:
+    app: crm-frontend         # Deployment label
+spec:
+  replicas: 1                 # Desired state: Run 1 instance of Frontend
+  selector:
+    matchLabels:
+      app: crm-frontend       # Manages pods matching label app=crm-frontend
+  template:
+    metadata:
+      labels:
+        app: crm-frontend     # Tag assigned to frontend pods
+    spec:
+      containers:
+        - name: crm-frontend  # Container name
+          image: crm-frontend:latest # Local Docker image built from /frontend
+          imagePullPolicy: IfNotPresent # Use local container image
+          ports:
+            - containerPort: 80 # Nginx/Vue web server port
+
+---
+
+# ------------------------------------------------------------------------------
+# 2. SERVICE: NodePort Service to expose Frontend to browser outside Kubernetes
+# ------------------------------------------------------------------------------
+apiVersion: v1                # K8s API version for networking
+kind: Service                 # Resource type: Service
+metadata:
+  name: frontend-service      # Name of frontend service
+spec:
+  type: NodePort              # Exposes service on Host machine IP on a static port
+  selector:
+    app: crm-frontend         # Routes incoming browser requests to frontend pod
+  ports:
+    - port: 80                # Internal cluster service port
+      targetPort: 80          # Nginx container port
+      nodePort: 30080         # Host machine port (Access via http://localhost:30080)

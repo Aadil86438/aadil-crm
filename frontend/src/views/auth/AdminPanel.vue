@@ -89,6 +89,13 @@
                 {{ redisData.key_count }} keys
               </v-chip>
             </v-tab>
+            <v-tab value="k8s">
+              <v-icon left color="blue">mdi-kubernetes</v-icon>
+              Kubernetes Cluster Visualizer
+              <v-chip size="x-small" color="blue lighten-5" class="ml-2 font-weight-bold text-caption blue--text" label v-if="k8sData.connected">
+                {{ k8sData.pod_count }} pods
+              </v-chip>
+            </v-tab>
           </v-tabs>
         </v-card>
 
@@ -380,6 +387,93 @@
             </v-card>
           </v-dialog>
         </div>
+
+        <!-- VIEW 3: KUBERNETES CLUSTER VISUALIZER & CRASH SIMULATOR -->
+        <div v-else-if="currentView === 2">
+          <!-- Connection Status & Controls Card -->
+          <v-card class="mb-6 pa-5 banner-card" elevation="0">
+            <div class="d-flex align-center justify-space-between flex-wrap" style="gap: 16px">
+              <div class="d-flex align-center">
+                <v-avatar :color="k8sData.connected ? 'blue lighten-5' : 'red lighten-5'" size="48" class="mr-3">
+                  <v-icon :color="k8sData.connected ? 'primary' : 'error'">
+                    {{ k8sData.connected ? 'mdi-kubernetes' : 'mdi-server-off' }}
+                  </v-icon>
+                </v-avatar>
+                <div>
+                  <div class="d-flex align-center">
+                    <span class="text-h6 font-weight-bold text--primary mr-2">Kubernetes Engine Visualizer</span>
+                    <v-chip :color="k8sData.connected ? 'primary' : 'error'" small label class="font-weight-bold text-white">
+                      {{ k8sData.connected ? 'CLUSTER ONLINE' : 'OFFLINE' }}
+                    </v-chip>
+                  </div>
+                  <div class="text-body-2 grey--text">
+                    Node: <strong class="black--text">{{ k8sData.pods[0] ? k8sData.pods[0].node : 'docker-desktop' }}</strong> |
+                    Active Pods: <strong class="primary--text">{{ k8sData.pod_count }}</strong>
+                  </div>
+                </div>
+              </div>
+
+              <div class="d-flex align-center" style="gap: 12px">
+                <v-btn color="primary" outlined small @click="fetchK8sData" :loading="loadingK8s">
+                  <v-icon left small>mdi-refresh</v-icon>
+                  Poll Pods Live
+                </v-btn>
+              </div>
+            </div>
+          </v-card>
+
+          <!-- Interactive Crash Simulator Warning Banner -->
+          <v-alert type="info" outlined dense class="mb-6 rounded-lg" icon="mdi-head-lightbulb-outline">
+            <strong>🎓 Interactive Auto-Healing Test:</strong> Click the <strong>💥 SIMULATE CRASH / KILL POD</strong> button on any Pod below. Kubernetes will immediately detect its death, auto-heal, and spin up a brand-new replacement Pod within seconds!
+          </v-alert>
+
+          <!-- Pods Visual Cards Grid -->
+          <v-row class="mb-6">
+            <v-col v-for="pod in k8sData.pods" :key="pod.name" cols="12" md="6">
+              <v-card class="pa-4 rounded-xl border elevation-0" style="background: white; border: 1px solid #E2E8F0">
+                <div class="d-flex align-center justify-space-between mb-3">
+                  <div class="d-flex align-center">
+                    <v-avatar size="40" color="blue lighten-5" class="mr-3">
+                      <v-icon color="primary" small>
+                        {{ pod.component === 'postgres' ? 'mdi-database' : (pod.component === 'redis' ? 'mdi-database-clock' : (pod.component === 'crm-frontend' ? 'mdi-web' : 'mdi-cog')) }}
+                      </v-icon>
+                    </v-avatar>
+                    <div>
+                      <div class="font-weight-bold text-subtitle-2 text--primary">{{ pod.name }}</div>
+                      <div class="caption grey--text">Component: <strong>{{ pod.component.toUpperCase() }}</strong></div>
+                    </div>
+                  </div>
+
+                  <v-chip small :color="pod.status === 'Running' ? 'success' : 'warning'" dark class="font-weight-bold">
+                    <v-icon left x-small>{{ pod.status === 'Running' ? 'mdi-check-circle' : 'mdi-clock-outline' }}</v-icon>
+                    {{ pod.status.toUpperCase() }}
+                  </v-chip>
+                </div>
+
+                <v-divider class="mb-3"></v-divider>
+
+                <div class="d-flex justify-space-between caption grey--text text--darken-2 mb-3">
+                  <div>Node: <strong class="black--text">{{ pod.node }}</strong></div>
+                  <div>Pod IP: <strong class="black--text">{{ pod.ip || 'Local' }}</strong></div>
+                  <div>Ready: <strong class="success--text">{{ pod.ready }}</strong></div>
+                  <div>Restarts: <strong class="error--text">{{ pod.restarts }}</strong></div>
+                </div>
+
+                <v-btn
+                  color="error"
+                  block
+                  outlined
+                  class="rounded-lg font-weight-bold"
+                  :loading="killingPod === pod.name"
+                  @click="killPod(pod.name)"
+                >
+                  <v-icon left small>mdi-bomb</v-icon>
+                  💥 SIMULATE CRASH / KILL POD
+                </v-btn>
+              </v-card>
+            </v-col>
+          </v-row>
+        </div>
       </div>
     </v-container>
   </div>
@@ -412,6 +506,9 @@ export default {
       deletingKey: null,
       selectedKey: null,
       keyDialog: false,
+      k8sData: { connected: false, pod_count: 0, pods: [] },
+      loadingK8s: false,
+      killingPod: null,
       redisHeaders: [
         { text: 'KEY NAME', value: 'key', sortable: true },
         { text: 'DATA TYPE', value: 'type', sortable: true },
@@ -433,6 +530,8 @@ export default {
     currentView(val) {
       if (val === 1) {
         this.fetchRedisData()
+      } else if (val === 2) {
+        this.fetchK8sData()
       }
     }
   },
@@ -490,6 +589,31 @@ export default {
         console.error('Failed to fetch Redis data', e)
       } finally {
         this.loadingRedis = false
+      }
+    },
+    async fetchK8sData() {
+      this.loadingK8s = true
+      try {
+        const res = await registrationService.getK8sStatus(this.adminToken)
+        this.k8sData = res.data.data || { connected: false, pod_count: 0, pods: [] }
+      } catch (e) {
+        console.error('Failed to fetch K8s cluster status', e)
+      } finally {
+        this.loadingK8s = false
+      }
+    },
+    async killPod(podName) {
+      this.killingPod = podName
+      try {
+        await registrationService.killK8sPod(podName, this.adminToken)
+        // Poll status 3 times over 6 seconds to show auto-healing live transition
+        setTimeout(() => this.fetchK8sData(), 800)
+        setTimeout(() => this.fetchK8sData(), 2500)
+        setTimeout(() => this.fetchK8sData(), 5000)
+      } catch (e) {
+        alert(e.response?.data?.message || 'Failed to kill pod')
+      } finally {
+        this.killingPod = null
       }
     },
     viewKeyDetails(item) {

@@ -43,6 +43,7 @@ func Setup(cfg *config.Config) http.Handler {
 	auditH := handlers.NewAuditHandler(auditRepo)
 	healthReportH := handlers.NewHealthReportHandler(cfg)
 	paymentH := handlers.NewPaymentHandler(cfg, regRepo)
+	k8sH := handlers.NewK8sHandler()
 
 	mux := http.NewServeMux()
 
@@ -151,6 +152,20 @@ func Setup(cfg *config.Config) http.Handler {
 	mux.Handle("/api/admin/health-report/trigger", adminAuth(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodPost {
 			healthReportH.TriggerHealthReport(w, r)
+		} else {
+			http.NotFound(w, r)
+		}
+	})))
+	mux.Handle("/api/admin/k8s/status", adminAuth(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet {
+			k8sH.GetStatus(w, r)
+		} else {
+			http.NotFound(w, r)
+		}
+	})))
+	mux.Handle("/api/admin/k8s/kill-pod", adminAuth(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodPost {
+			k8sH.KillPod(w, r)
 		} else {
 			http.NotFound(w, r)
 		}
