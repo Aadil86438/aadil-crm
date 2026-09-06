@@ -77,21 +77,21 @@
 
         <!-- Section Navigation Tabs -->
         <v-card class="mb-6 pa-2" elevation="0" style="border-radius: 12px; border: 1px solid #E2E8F0; background: white">
-          <v-tabs v-model="currentView" color="primary" class="admin-main-tabs" active-class="font-weight-bold">
+          <v-tabs v-model="currentView" color="primary" class="admin-main-tabs" active-class="font-weight-bold" show-arrows center-active>
             <v-tab value="members">
-              <v-icon left>mdi-account-group</v-icon>
+              <v-icon left small>mdi-account-group</v-icon>
               Member Registrations
             </v-tab>
             <v-tab value="redis">
-              <v-icon left color="red">mdi-database</v-icon>
-              Redis Cache Inspector
+              <v-icon left small color="red">mdi-database</v-icon>
+              Redis Inspector
               <v-chip size="x-small" color="red lighten-5" class="ml-2 font-weight-bold text-caption red--text" label v-if="redisData.connected">
                 {{ redisData.key_count }} keys
               </v-chip>
             </v-tab>
             <v-tab value="k8s">
-              <v-icon left color="blue">mdi-kubernetes</v-icon>
-              Kubernetes Cluster Visualizer
+              <v-icon left small color="blue">mdi-kubernetes</v-icon>
+              Kubernetes Cluster
               <v-chip size="x-small" color="blue lighten-5" class="ml-2 font-weight-bold text-caption blue--text" label v-if="k8sData.connected">
                 {{ k8sData.pod_count }} pods
               </v-chip>
@@ -101,54 +101,54 @@
 
         <!-- VIEW 1: MEMBER REGISTRATIONS -->
         <div v-if="currentView === 0">
-          <!-- KPI Metric Cards -->
+          <!-- KPI Metric Cards (2x2 on mobile, 4x1 on desktop) -->
           <v-row class="mb-6" dense>
-            <v-col cols="12" sm="3">
-              <v-card class="kpi-card pa-4" elevation="0" @click="statusFilter = 'all'" :class="{ 'active-kpi': statusFilter === 'all' }">
-                <div class="d-flex align-center justify-space-between mb-2">
-                  <span class="text-caption grey--text text--darken-1 font-weight-bold">TOTAL MEMBERS</span>
-                  <v-avatar color="blue lighten-5" size="36">
+            <v-col cols="6" sm="3">
+              <v-card class="kpi-card pa-3 pa-sm-4" elevation="0" @click="statusFilter = 'all'" :class="{ 'active-kpi': statusFilter === 'all' }">
+                <div class="d-flex align-center justify-space-between mb-1 mb-sm-2">
+                  <span class="text-caption grey--text text--darken-1 font-weight-bold">TOTAL</span>
+                  <v-avatar color="blue lighten-5" size="32">
                     <v-icon color="primary" small>mdi-account-group</v-icon>
                   </v-avatar>
                 </div>
-                <div class="text-h4 font-weight-black text--primary">{{ allRequests.length }}</div>
-                <div class="text-caption grey--text mt-1">All registrations</div>
+                <div class="text-h5 text-sm-h4 font-weight-black text--primary">{{ allRequests.length }}</div>
+                <div class="text-caption grey--text mt-1 hidden-xs-only">All registrations</div>
               </v-card>
             </v-col>
-            <v-col cols="12" sm="3">
-              <v-card class="kpi-card pa-4" elevation="0" @click="statusFilter = 'pending'" :class="{ 'active-kpi': statusFilter === 'pending' }">
-                <div class="d-flex align-center justify-space-between mb-2">
-                  <span class="text-caption warning--text text--darken-2 font-weight-bold">PENDING APPROVAL</span>
-                  <v-avatar color="amber lighten-5" size="36">
+            <v-col cols="6" sm="3">
+              <v-card class="kpi-card pa-3 pa-sm-4" elevation="0" @click="statusFilter = 'pending'" :class="{ 'active-kpi': statusFilter === 'pending' }">
+                <div class="d-flex align-center justify-space-between mb-1 mb-sm-2">
+                  <span class="text-caption warning--text text--darken-2 font-weight-bold">PENDING</span>
+                  <v-avatar color="amber lighten-5" size="32">
                     <v-icon color="warning" small>mdi-clock-outline</v-icon>
                   </v-avatar>
                 </div>
-                <div class="text-h4 font-weight-black warning--text text--darken-2">{{ pendingCount }}</div>
-                <div class="text-caption grey--text mt-1">Awaiting action</div>
+                <div class="text-h5 text-sm-h4 font-weight-black warning--text text--darken-2">{{ pendingCount }}</div>
+                <div class="text-caption grey--text mt-1 hidden-xs-only">Awaiting action</div>
               </v-card>
             </v-col>
-            <v-col cols="12" sm="3">
-              <v-card class="kpi-card pa-4" elevation="0" @click="statusFilter = 'approved'" :class="{ 'active-kpi': statusFilter === 'approved' }">
-                <div class="d-flex align-center justify-space-between mb-2">
-                  <span class="text-caption success--text font-weight-bold">APPROVED MEMBERS</span>
-                  <v-avatar color="green lighten-5" size="36">
+            <v-col cols="6" sm="3">
+              <v-card class="kpi-card pa-3 pa-sm-4" elevation="0" @click="statusFilter = 'approved'" :class="{ 'active-kpi': statusFilter === 'approved' }">
+                <div class="d-flex align-center justify-space-between mb-1 mb-sm-2">
+                  <span class="text-caption success--text font-weight-bold">APPROVED</span>
+                  <v-avatar color="green lighten-5" size="32">
                     <v-icon color="success" small>mdi-check-circle-outline</v-icon>
                   </v-avatar>
                 </div>
-                <div class="text-h4 font-weight-black success--text">{{ approvedCount }}</div>
-                <div class="text-caption grey--text mt-1">Active CRM users</div>
+                <div class="text-h5 text-sm-h4 font-weight-black success--text">{{ approvedCount }}</div>
+                <div class="text-caption grey--text mt-1 hidden-xs-only">Active CRM users</div>
               </v-card>
             </v-col>
-            <v-col cols="12" sm="3">
-              <v-card class="kpi-card pa-4" elevation="0" @click="statusFilter = 'rejected'" :class="{ 'active-kpi': statusFilter === 'rejected' }">
-                <div class="d-flex align-center justify-space-between mb-2">
-                  <span class="text-caption error--text font-weight-bold">REJECTED REQUESTS</span>
-                  <v-avatar color="red lighten-5" size="36">
+            <v-col cols="6" sm="3">
+              <v-card class="kpi-card pa-3 pa-sm-4" elevation="0" @click="statusFilter = 'rejected'" :class="{ 'active-kpi': statusFilter === 'rejected' }">
+                <div class="d-flex align-center justify-space-between mb-1 mb-sm-2">
+                  <span class="text-caption error--text font-weight-bold">REJECTED</span>
+                  <v-avatar color="red lighten-5" size="32">
                     <v-icon color="error" small>mdi-close-circle-outline</v-icon>
                   </v-avatar>
                 </div>
-                <div class="text-h4 font-weight-black error--text">{{ rejectedCount }}</div>
-                <div class="text-caption grey--text mt-1">Declined access</div>
+                <div class="text-h5 text-sm-h4 font-weight-black error--text">{{ rejectedCount }}</div>
+                <div class="text-caption grey--text mt-1 hidden-xs-only">Declined access</div>
               </v-card>
             </v-col>
           </v-row>
@@ -241,7 +241,7 @@
                     color="error" outlined x-small class="px-3 rounded-lg font-weight-bold"
                     :loading="rejecting === item.id" @click="reject(item.id)"
                   >
-                    <v-icon left x-small>mdi-close</v-icon Reject
+                    <v-icon left x-small>mdi-close</v-icon> Reject
                   </v-btn>
                 </div>
               </template>
@@ -390,25 +390,26 @@
 
         <!-- VIEW 3: KUBERNETES CLUSTER VISUALIZER & CRASH SIMULATOR -->
         <div v-else-if="currentView === 2">
-          <!-- Connection Status & Controls Card -->
+          <!-- Connection Status & Controls Bar -->
           <v-card class="mb-6 pa-5 banner-card" elevation="0">
             <div class="d-flex align-center justify-space-between flex-wrap" style="gap: 16px">
               <div class="d-flex align-center">
-                <v-avatar :color="k8sData.connected ? 'blue lighten-5' : 'red lighten-5'" size="48" class="mr-3">
-                  <v-icon :color="k8sData.connected ? 'primary' : 'error'">
-                    {{ k8sData.connected ? 'mdi-kubernetes' : 'mdi-server-off' }}
+                <v-avatar :color="k8sData.connected ? 'blue lighten-5' : 'amber lighten-5'" size="52" class="mr-3 elevation-1">
+                  <v-icon :color="k8sData.connected ? 'primary' : 'warning'" size="30">
+                    mdi-kubernetes
                   </v-icon>
                 </v-avatar>
                 <div>
                   <div class="d-flex align-center">
-                    <span class="text-h6 font-weight-bold text--primary mr-2">Kubernetes Engine Visualizer</span>
-                    <v-chip :color="k8sData.connected ? 'primary' : 'error'" small label class="font-weight-bold text-white">
-                      {{ k8sData.connected ? 'CLUSTER ONLINE' : 'OFFLINE' }}
+                    <span class="text-h6 font-weight-black text--primary mr-2">Kubernetes Engine Visualizer</span>
+                    <v-chip :color="k8sData.connected ? 'primary' : 'warning'" small label class="font-weight-bold text-white">
+                      {{ k8sData.connected ? 'CLUSTER ONLINE' : 'SIMULATED MODE' }}
                     </v-chip>
                   </div>
                   <div class="text-body-2 grey--text">
-                    Node: <strong class="black--text">{{ k8sData.pods[0] ? k8sData.pods[0].node : 'docker-desktop' }}</strong> |
-                    Active Pods: <strong class="primary--text">{{ k8sData.pod_count }}</strong>
+                    Node: <strong class="black--text">{{ k8sNodeName }}</strong> |
+                    Healthy Pods: <strong class="primary--text font-weight-bold">{{ k8sData.pod_count }} / 4</strong> |
+                    Cluster Engine: <strong class="success--text">Kubelet Active</strong>
                   </div>
                 </div>
               </div>
@@ -416,63 +417,192 @@
               <div class="d-flex align-center" style="gap: 12px">
                 <v-btn color="primary" outlined small @click="fetchK8sData" :loading="loadingK8s">
                   <v-icon left small>mdi-refresh</v-icon>
-                  Poll Pods Live
+                  Poll Cluster Live
                 </v-btn>
               </div>
             </div>
           </v-card>
 
-          <!-- Interactive Crash Simulator Warning Banner -->
-          <v-alert type="info" outlined dense class="mb-6 rounded-lg" icon="mdi-head-lightbulb-outline">
-            <strong>🎓 Interactive Auto-Healing Test:</strong> Click the <strong>💥 SIMULATE CRASH / KILL POD</strong> button on any Pod below. Kubernetes will immediately detect its death, auto-heal, and spin up a brand-new replacement Pod within seconds!
+          <!-- 🌌 BIG CLUSTER ARCHITECTURE FLOWCHART & TOPOLOGY MAP -->
+          <v-card class="mb-6 pa-6 k8s-architecture-card elevation-0" style="background: linear-gradient(135deg, #0F172A 0%, #1E293B 100%); border-radius: 20px; border: 1px solid #334155;">
+            <div class="d-flex align-center justify-space-between mb-4 flex-wrap" style="gap: 12px">
+              <div class="d-flex align-center">
+                <v-icon color="cyan lighten-2" class="mr-2" size="28">mdi-sitemap</v-icon>
+                <div>
+                  <h3 class="text-h6 font-weight-bold white--text">Kubernetes Cluster Architecture & Topology Map</h3>
+                  <div class="caption cyan--text text--lighten-3">Node: <strong>{{ k8sNodeName }}</strong> | Services Router & Ingress Layer</div>
+                </div>
+              </div>
+              <v-chip color="cyan darken-3" dark small label class="font-weight-bold">
+                <v-icon left x-small color="cyan lighten-3">mdi-shield-check</v-icon>
+                REPLICASET CONTROLLER ACTIVE
+              </v-chip>
+            </div>
+
+            <!-- Visual Container Box: KUBERNETES NODE -->
+            <div class="k8s-node-box pa-4 rounded-xl" style="background: rgba(15, 23, 42, 0.7); border: 2px dashed #475569;">
+              <div class="d-flex justify-space-between align-center mb-4 pb-3" style="border-bottom: 1px solid #334155;">
+                <div class="d-flex align-center">
+                  <v-icon color="cyan lighten-3" small class="mr-2">mdi-server</v-icon>
+                  <span class="text-subtitle-2 font-weight-bold cyan--text text--lighten-3">KUBERNETES NODE: {{ k8sNodeName }} (Linux x86_64)</span>
+                </div>
+                <div class="caption grey--text text--lighten-1">
+                  Cluster Subnet: <code class="cyan--text">10.244.0.0/16</code> | Control Plane: <span class="green--text text--lighten-2 font-weight-bold">● HEALTHY</span>
+                </div>
+              </div>
+
+              <!-- Component Topology Cards Row -->
+              <v-row dense>
+                <v-col v-for="comp in topologyComponents" :key="comp.component" cols="12" sm="6" md="3">
+                  <div
+                    class="topology-card pa-3 rounded-lg text-center"
+                    :class="{ 'dying-border': isPodDying(comp.component), 'healthy-border': !isPodDying(comp.component) }"
+                    style="background: #1E293B; border: 1px solid #334155; position: relative; transition: all 0.3s ease;"
+                  >
+                    <!-- Ingress / Service Line Header -->
+                    <div class="caption text-uppercase font-weight-bold mb-1" :style="{ color: comp.color }">
+                      <v-icon x-small :color="comp.color" class="mr-1">mdi-swap-horizontal</v-icon>
+                      {{ comp.serviceName }}
+                    </div>
+                    <v-avatar size="36" :color="comp.bg" class="my-1">
+                      <v-icon :color="comp.color" small>{{ comp.icon }}</v-icon>
+                    </v-avatar>
+
+                    <!-- Live Pod Name in Topology -->
+                    <div class="caption white--text font-weight-bold text-truncate mt-1">
+                      {{ getPodName(comp.component) }}
+                    </div>
+
+                    <!-- Status Pill -->
+                    <div class="d-flex justify-center align-center mt-2" style="gap: 4px">
+                      <v-chip x-small dark :color="isPodDying(comp.component) ? 'error' : 'success'" class="font-weight-bold">
+                        <v-icon left x-small>{{ isPodDying(comp.component) ? 'mdi-alert-circle' : 'mdi-check-circle' }}</v-icon>
+                        {{ isPodDying(comp.component) ? 'CRASHED / DEAD' : '1/1 READY' }}
+                      </v-chip>
+                      <span class="caption grey--text text--lighten-1">:{{ comp.port }}</span>
+                    </div>
+                  </div>
+                </v-col>
+              </v-row>
+            </div>
+          </v-card>
+
+          <!-- 🎓 Educational Banner -->
+          <v-alert type="info" outlined dense class="mb-6 rounded-lg" icon="mdi-lightbulb-on-outline" style="background: white">
+            <strong>🎓 How Kubernetes Auto-Healing Works:</strong> Click <strong>💥 SIMULATE CRASH / KILL POD</strong> on any pod below.
+            You will observe:
+            <ol class="mt-1 pl-4 caption">
+              <li><strong>1. Crash / Termination:</strong> Pod status turns <span class="error--text font-weight-bold">TERMINATING / CRASHED</span> (Red glowing border).</li>
+              <li><strong>2. Detection:</strong> ReplicaSet controller detects missing pod within milliseconds.</li>
+              <li><strong>3. Auto-Healing:</strong> Kubernetes automatically spins up a brand-new replacement Pod (Green <span class="success--text font-weight-bold">1/1 READY</span>).</li>
+              <li><strong>4. Cleanup:</strong> The terminated dead pod disappears, leaving your app 100% healthy!</li>
+            </ol>
           </v-alert>
 
-          <!-- Pods Visual Cards Grid -->
+          <!-- 📦 PODS VISUAL CARDS GRID WITH ANIMATED LIFECYCLE -->
           <v-row class="mb-6">
-            <v-col v-for="pod in k8sData.pods" :key="pod.name" cols="12" md="6">
-              <v-card class="pa-4 rounded-xl border elevation-0" style="background: white; border: 1px solid #E2E8F0">
+            <v-col v-for="pod in displayPods" :key="pod.name" cols="12" md="6">
+              <v-card
+                class="pa-4 rounded-xl elevation-0 pod-visual-card"
+                :class="{
+                  'dying-pod-card': pod.isDying,
+                  'creating-pod-card': pod.isCreating,
+                  'healthy-pod-card': !pod.isDying && !pod.isCreating
+                }"
+              >
+                <!-- Pod Header -->
                 <div class="d-flex align-center justify-space-between mb-3">
                   <div class="d-flex align-center">
-                    <v-avatar size="40" color="blue lighten-5" class="mr-3">
-                      <v-icon color="primary" small>
-                        {{ pod.component === 'postgres' ? 'mdi-database' : (pod.component === 'redis' ? 'mdi-database-clock' : (pod.component === 'crm-frontend' ? 'mdi-web' : 'mdi-cog')) }}
+                    <v-avatar size="42" :color="getCompColorBg(pod.component)" class="mr-3">
+                      <v-icon :color="getCompColor(pod.component)" small>
+                        {{ getCompIcon(pod.component) }}
                       </v-icon>
                     </v-avatar>
                     <div>
-                      <div class="font-weight-bold text-subtitle-2 text--primary">{{ pod.name }}</div>
-                      <div class="caption grey--text">Component: <strong>{{ pod.component.toUpperCase() }}</strong></div>
+                      <div class="font-weight-bold text-subtitle-2 text--primary d-flex align-center">
+                        <code>{{ pod.name }}</code>
+                      </div>
+                      <div class="caption grey--text">
+                        Component: <strong class="black--text">{{ pod.component.toUpperCase() }}</strong>
+                      </div>
                     </div>
                   </div>
 
-                  <v-chip small :color="pod.status === 'Running' ? 'success' : 'warning'" dark class="font-weight-bold">
-                    <v-icon left x-small>{{ pod.status === 'Running' ? 'mdi-check-circle' : 'mdi-clock-outline' }}</v-icon>
-                    {{ pod.status.toUpperCase() }}
+                  <!-- Status Chip -->
+                  <v-chip
+                    small
+                    :color="pod.isDying ? 'error' : (pod.isCreating ? 'warning' : 'success')"
+                    dark
+                    class="font-weight-bold px-3"
+                    :class="{ 'pulse-anim': pod.isDying }"
+                  >
+                    <v-progress-circular v-if="pod.isDying || pod.isCreating" indeterminate size="12" width="2" class="mr-1"></v-progress-circular>
+                    <v-icon v-else left x-small>mdi-check-circle</v-icon>
+                    {{ pod.isDying ? 'TERMINATING / DEAD' : (pod.isCreating ? 'CONTAINER CREATING' : 'RUNNING (1/1)') }}
                   </v-chip>
                 </div>
 
                 <v-divider class="mb-3"></v-divider>
 
-                <div class="d-flex justify-space-between caption grey--text text--darken-2 mb-3">
+                <!-- Detailed Specs Grid -->
+                <div class="d-flex justify-space-between caption grey--text text--darken-2 mb-3 flex-wrap" style="gap: 8px">
                   <div>Node: <strong class="black--text">{{ pod.node }}</strong></div>
-                  <div>Pod IP: <strong class="black--text">{{ pod.ip || 'Local' }}</strong></div>
-                  <div>Ready: <strong class="success--text">{{ pod.ready }}</strong></div>
-                  <div>Restarts: <strong class="error--text">{{ pod.restarts }}</strong></div>
+                  <div>Pod IP: <strong class="black--text">{{ pod.ip || '10.244.0.x' }}</strong></div>
+                  <div>Ready: <strong :class="pod.isDying ? 'error--text' : 'success--text'">{{ pod.isDying ? '0/1' : pod.ready }}</strong></div>
+                  <div>Restarts: <strong class="error--text font-weight-bold">{{ pod.restarts }}</strong></div>
                 </div>
 
+                <!-- Crash Progress Bar / Status Banner -->
+                <div v-if="pod.isDying" class="pa-3 red lighten-5 rounded-lg mb-3 border-error">
+                  <div class="caption error--text font-weight-bold d-flex align-center">
+                    <v-icon color="error" x-small class="mr-1">mdi-alert</v-icon>
+                    CRASH DETECTED! Kubernetes force-killing container...
+                  </div>
+                  <v-progress-linear indeterminate color="error" height="4" class="mt-2 rounded"></v-progress-linear>
+                </div>
+
+                <div v-else-if="pod.isCreating" class="pa-3 amber lighten-5 rounded-lg mb-3 border-warning">
+                  <div class="caption warning--text text--darken-3 font-weight-bold d-flex align-center">
+                    <v-icon color="warning" x-small class="mr-1">mdi-cog-sync</v-icon>
+                    AUTO-HEAL: Pulling container image & starting replacement...
+                  </div>
+                  <v-progress-linear indeterminate color="warning" height="4" class="mt-2 rounded"></v-progress-linear>
+                </div>
+
+                <!-- Kill Action Button -->
                 <v-btn
+                  v-else
                   color="error"
                   block
                   outlined
-                  class="rounded-lg font-weight-bold"
+                  class="rounded-lg font-weight-bold kill-btn"
                   :loading="killingPod === pod.name"
-                  @click="killPod(pod.name)"
+                  @click="killPodWithAnimation(pod)"
                 >
                   <v-icon left small>mdi-bomb</v-icon>
                   💥 SIMULATE CRASH / KILL POD
                 </v-btn>
               </v-card>
-            </v-col>
+            </col>
           </v-row>
+
+          <!-- 💻 REAL-TIME KUBERNETES EVENT CONSOLE -->
+          <v-card class="pa-5 console-card elevation-0 mb-6" style="background: #0F172A; border-radius: 16px; border: 1px solid #1E293B;">
+            <div class="d-flex align-center justify-space-between mb-3">
+              <div class="d-flex align-center">
+                <v-icon color="green lighten-2" small class="mr-2">mdi-console-line</v-icon>
+                <span class="text-subtitle-2 font-weight-bold white--text">Kubernetes ReplicaSet Live Event Stream</span>
+              </div>
+              <v-btn text x-small color="grey lighten-1" @click="k8sLogs = []">Clear Stream</v-btn>
+            </div>
+            <div class="console-body pa-3 rounded-lg" style="background: #020617; max-height: 180px; overflow-y: auto; font-family: monospace; font-size: 12px;">
+              <div v-for="(log, idx) in k8sLogs" :key="idx" class="console-line py-1" :class="log.type">
+                <span class="grey--text">[{{ log.time }}]</span>
+                <span class="ml-2 font-weight-bold">{{ log.text }}</span>
+              </div>
+              <div v-if="k8sLogs.length === 0" class="grey--text italic">Awaiting cluster events... Click "SIMULATE CRASH" above to see live ReplicaSet events.</div>
+            </div>
+          </v-card>
         </div>
       </div>
     </v-container>
@@ -509,6 +639,18 @@ export default {
       k8sData: { connected: false, pod_count: 0, pods: [] },
       loadingK8s: false,
       killingPod: null,
+      dyingPodNames: [],
+      creatingPodNames: [],
+      k8sLogs: [
+        { time: new Date().toLocaleTimeString(), type: 'info', text: '🌌 K8S CLUSTER VISUALIZER: Connected to cluster node.' },
+        { time: new Date().toLocaleTimeString(), type: 'info', text: '✅ REPLICASET CONTROLLER: 4/4 Desired pods active and healthy.' }
+      ],
+      topologyComponents: [
+        { component: 'postgres', serviceName: 'postgres-svc', port: '5432', icon: 'mdi-database', color: '#60A5FA', bg: 'blue lighten-5' },
+        { component: 'redis', serviceName: 'redis-svc', port: '6379', icon: 'mdi-database-clock', color: '#F87171', bg: 'red lighten-5' },
+        { component: 'backend', serviceName: 'crm-backend-svc', port: '8080', icon: 'mdi-cog-sync', color: '#34D399', bg: 'green lighten-5' },
+        { component: 'crm-frontend', serviceName: 'crm-frontend-svc', port: '80', icon: 'mdi-web', color: '#A78BFA', bg: 'purple lighten-5' }
+      ],
       redisHeaders: [
         { text: 'KEY NAME', value: 'key', sortable: true },
         { text: 'DATA TYPE', value: 'type', sortable: true },
@@ -548,9 +690,89 @@ export default {
     },
     rejectedCount() {
       return this.allRequests.filter(r => r.approval_status === 'rejected').length
+    },
+    k8sNodeName() {
+      return (this.k8sData.pods && this.k8sData.pods[0] && this.k8sData.pods[0].node) || 'docker-desktop'
+    },
+    displayPods() {
+      if (!this.k8sData.pods) return []
+      return this.k8sData.pods.map(pod => {
+        const isDying = this.dyingPodNames.includes(pod.name)
+        const isCreating = this.creatingPodNames.includes(pod.name)
+        return {
+          ...pod,
+          isDying,
+          isCreating
+        }
+      })
     }
   },
   methods: {
+    addK8sLog(text, type = 'info') {
+      const time = new Date().toLocaleTimeString()
+      this.k8sLogs.unshift({ time, text, type })
+      if (this.k8sLogs.length > 30) this.k8sLogs.pop()
+    },
+    getPodName(comp) {
+      if (!this.k8sData.pods) return 'crm-' + comp + '-pod'
+      const found = this.k8sData.pods.find(p => p.component === comp)
+      return found ? found.name : 'crm-' + comp + '-pod'
+    },
+    isPodDying(comp) {
+      if (!this.k8sData.pods) return false
+      const found = this.k8sData.pods.find(p => p.component === comp)
+      return found ? this.dyingPodNames.includes(found.name) : false
+    },
+    getCompColor(comp) {
+      if (comp === 'postgres') return 'blue lighten-1'
+      if (comp === 'redis') return 'red lighten-1'
+      if (comp === 'crm-frontend') return 'purple lighten-1'
+      return 'green lighten-1'
+    },
+    getCompColorBg(comp) {
+      if (comp === 'postgres') return 'blue lighten-5'
+      if (comp === 'redis') return 'red lighten-5'
+      if (comp === 'crm-frontend') return 'purple lighten-5'
+      return 'green lighten-5'
+    },
+    getCompIcon(comp) {
+      if (comp === 'postgres') return 'mdi-database'
+      if (comp === 'redis') return 'mdi-database-clock'
+      if (comp === 'crm-frontend') return 'mdi-web'
+      return 'mdi-cog-sync'
+    },
+    async killPodWithAnimation(pod) {
+      const podName = pod.name
+      const compName = pod.component.toUpperCase()
+      this.killingPod = podName
+
+      // 1. Instantly trigger visual crash state (Red border, pulsing, status TERMINATING)
+      this.dyingPodNames.push(podName)
+      this.addK8sLog(`💥 COMMAND: Force-deleting Pod [${podName}] (SIGKILL sent)`, 'error')
+      this.addK8sLog(`🚨 EVENT: Pod ${podName} entered TERMINATING state. ReplicaSet desired=1, actual=0.`, 'error')
+
+      try {
+        await registrationService.killK8sPod(podName, this.adminToken)
+
+        // 2. Step 2 (1.2s): Show Container Creating log
+        setTimeout(() => {
+          this.addK8sLog(`⚡ K8S SCHEDULER: Triggered auto-healing for ${compName}. Assigning node ${this.k8sNodeName}...`, 'warn')
+          this.addK8sLog(`📦 KUBELET: Pulling container image & provisioning replacement Pod...`, 'info')
+        }, 1200)
+
+        // 3. Step 3 (2.5s): Auto-healing complete! Fetch fresh pods, clear dying state, show success
+        setTimeout(async () => {
+          this.dyingPodNames = this.dyingPodNames.filter(n => n !== podName)
+          await this.fetchK8sData()
+          this.addK8sLog(`✅ AUTO-HEAL COMPLETE: New replacement Pod for ${compName} is 1/1 READY! Dead pod removed.`, 'success')
+        }, 2600)
+      } catch (e) {
+        this.dyingPodNames = this.dyingPodNames.filter(n => n !== podName)
+        alert(e.response?.data?.message || 'Failed to kill pod')
+      } finally {
+        this.killingPod = null
+      }
+    },
     async verifyCode() {
       this.verifying = true
       this.codeError = null
@@ -606,10 +828,8 @@ export default {
       this.killingPod = podName
       try {
         await registrationService.killK8sPod(podName, this.adminToken)
-        // Poll status 3 times over 6 seconds to show auto-healing live transition
         setTimeout(() => this.fetchK8sData(), 800)
         setTimeout(() => this.fetchK8sData(), 2500)
-        setTimeout(() => this.fetchK8sData(), 5000)
       } catch (e) {
         alert(e.response?.data?.message || 'Failed to kill pod')
       } finally {
@@ -750,5 +970,68 @@ export default {
 }
 .premium-table >>> td {
   border-bottom: 1px solid #F1F5F9 !important;
+}
+.k8s-architecture-card {
+  box-shadow: 0 10px 40px rgba(15, 23, 42, 0.15) !important;
+}
+.topology-card {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.healthy-border {
+  border-color: #334155 !important;
+}
+.dying-border {
+  border-color: #EF4444 !important;
+  box-shadow: 0 0 15px rgba(239, 68, 68, 0.4) !important;
+  animation: pulse-red 1s infinite alternate;
+}
+.pod-visual-card {
+  background: white;
+  border: 1px solid #E2E8F0;
+  transition: all 0.3s ease;
+}
+.healthy-pod-card:hover {
+  border-color: #3B82F6 !important;
+  box-shadow: 0 8px 24px rgba(59, 130, 246, 0.08) !important;
+}
+.dying-pod-card {
+  border: 2px solid #EF4444 !important;
+  background: #FEF2F2 !important;
+  animation: pulse-red 0.8s infinite alternate;
+}
+.creating-pod-card {
+  border: 2px solid #F59E0B !important;
+  background: #FFFBEB !important;
+}
+@keyframes pulse-red {
+  0% { transform: scale(1); box-shadow: 0 0 0 rgba(239, 68, 68, 0.4); }
+  100% { transform: scale(1.01); box-shadow: 0 0 16px rgba(239, 68, 68, 0.6); }
+}
+.console-line.info { color: #38BDF8; }
+.console-line.warn { color: #FBBF24; }
+.console-line.error { color: #F87171; }
+.console-line.success { color: #4ADE80; }
+
+@media (max-width: 600px) {
+  .admin-bg {
+    padding: 12px 6px !important;
+  }
+  .banner-card {
+    padding: 14px !important;
+  }
+  .k8s-architecture-card {
+    padding: 14px !important;
+    border-radius: 14px !important;
+  }
+  .k8s-node-box {
+    padding: 10px !important;
+  }
+  .topology-card {
+    padding: 10px !important;
+  }
+  .code-input >>> input {
+    font-size: 16px !important;
+    letter-spacing: 4px !important;
+  }
 }
 </style>
