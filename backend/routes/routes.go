@@ -44,6 +44,7 @@ func Setup(cfg *config.Config) http.Handler {
 	healthReportH := handlers.NewHealthReportHandler(cfg)
 	paymentH := handlers.NewPaymentHandler(cfg, regRepo)
 	k8sH := handlers.NewK8sHandler()
+	logViewerH := handlers.NewLogViewerHandler()
 
 	mux := http.NewServeMux()
 
@@ -166,6 +167,28 @@ func Setup(cfg *config.Config) http.Handler {
 	mux.Handle("/api/admin/k8s/kill-pod", adminAuth(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodPost {
 			k8sH.KillPod(w, r)
+		} else {
+			http.NotFound(w, r)
+		}
+	})))
+	// ─── LOG VIEWER ROUTES (admin-protected) ──────────────────────
+	mux.Handle("/api/admin/logs", adminAuth(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet {
+			logViewerH.ListLogs(w, r)
+		} else {
+			http.NotFound(w, r)
+		}
+	})))
+	mux.Handle("/api/admin/logs/view", adminAuth(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet {
+			logViewerH.ViewLog(w, r)
+		} else {
+			http.NotFound(w, r)
+		}
+	})))
+	mux.Handle("/api/admin/logs/download", adminAuth(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet {
+			logViewerH.DownloadLog(w, r)
 		} else {
 			http.NotFound(w, r)
 		}

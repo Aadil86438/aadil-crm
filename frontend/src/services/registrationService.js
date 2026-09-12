@@ -54,5 +54,20 @@ export default {
     return axios.post(`${baseURL}/api/admin/k8s/kill-pod`, { podName }, {
       headers: { Authorization: `Bearer ${token}` }
     })
+  },
+
+  // Log Viewer endpoints
+  getLogFiles(token) {
+    return axios.get(`${baseURL}/api/admin/logs`, {
+      headers: { Authorization: `Bearer ${token}` }
+    })
+  },
+  viewLogFile(date, token) {
+    return axios.get(`${baseURL}/api/admin/logs/view?date=${date}`, {
+      headers: { Authorization: `Bearer ${token}` }
+    })
+  },
+  getLogDownloadURL(date, token) {
+    return `${baseURL}/api/admin/logs/download?date=${date}`
   }
 }

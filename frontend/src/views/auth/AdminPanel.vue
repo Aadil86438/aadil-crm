@@ -96,6 +96,13 @@
                 {{ k8sData.pod_count }} pods
               </v-chip>
             </v-tab>
+            <v-tab value="logs">
+              <v-icon left small color="teal">mdi-file-document-outline</v-icon>
+              Log Viewer
+              <v-chip size="x-small" color="teal lighten-5" class="ml-2 font-weight-bold text-caption teal--text" label v-if="logStats.total_files">
+                {{ logStats.total_files }} files
+              </v-chip>
+            </v-tab>
           </v-tabs>
         </v-card>
 
@@ -604,6 +611,326 @@
             </div>
           </v-card>
         </div>
+
+        <!-- VIEW 4: LOG VIEWER - PREMIUM UI -->
+        <div v-else-if="currentView === 3">
+          <!-- Hero Status Bar -->
+          <v-card class="mb-6 pa-5 banner-card" elevation="0">
+            <div class="d-flex align-center justify-space-between flex-wrap" style="gap: 16px">
+              <div class="d-flex align-center">
+                <v-avatar color="teal lighten-5" size="52" class="mr-3 elevation-1">
+                  <v-icon color="teal" size="28">mdi-file-document-multiple</v-icon>
+                </v-avatar>
+                <div>
+                  <div class="d-flex align-center">
+                    <span class="text-h6 font-weight-black text--primary mr-2">Application Log Viewer</span>
+                    <v-chip color="teal" small label class="font-weight-bold white--text">DAILY LOGS</v-chip>
+                  </div>
+                  <div class="text-body-2 grey--text">Browse, search, analyze & download daily API request logs from your CRM server</div>
+                </div>
+              </div>
+              <div class="d-flex align-center" style="gap: 12px">
+                <v-btn color="teal" outlined small @click="fetchLogFiles" :loading="loadingLogs">
+                  <v-icon left small>mdi-refresh</v-icon>
+                  Refresh Logs
+                </v-btn>
+              </div>
+            </div>
+          </v-card>
+
+          <!-- KPI Metric Cards -->
+          <v-row class="mb-6" dense>
+            <v-col cols="6" sm="3">
+              <v-card class="log-kpi-card pa-3 pa-sm-4" elevation="0">
+                <div class="d-flex align-center justify-space-between mb-2">
+                  <span class="text-caption teal--text font-weight-bold">LOG FILES</span>
+                  <v-avatar color="teal lighten-5" size="32">
+                    <v-icon color="teal" small>mdi-file-multiple</v-icon>
+                  </v-avatar>
+                </div>
+                <div class="text-h5 text-sm-h4 font-weight-black teal--text">{{ logStats.total_files || 0 }}</div>
+                <div class="text-caption grey--text mt-1 hidden-xs-only">Total daily files</div>
+              </v-card>
+            </v-col>
+            <v-col cols="6" sm="3">
+              <v-card class="log-kpi-card pa-3 pa-sm-4" elevation="0">
+                <div class="d-flex align-center justify-space-between mb-2">
+                  <span class="text-caption primary--text font-weight-bold">TODAY'S HITS</span>
+                  <v-avatar color="blue lighten-5" size="32">
+                    <v-icon color="primary" small>mdi-chart-line</v-icon>
+                  </v-avatar>
+                </div>
+                <div class="text-h5 text-sm-h4 font-weight-black primary--text">{{ logStats.today_requests || 0 }}</div>
+                <div class="text-caption grey--text mt-1 hidden-xs-only">API requests today</div>
+              </v-card>
+            </v-col>
+            <v-col cols="6" sm="3">
+              <v-card class="log-kpi-card pa-3 pa-sm-4" elevation="0">
+                <div class="d-flex align-center justify-space-between mb-2">
+                  <span class="text-caption error--text font-weight-bold">ERRORS</span>
+                  <v-avatar color="red lighten-5" size="32">
+                    <v-icon color="error" small>mdi-alert-circle</v-icon>
+                  </v-avatar>
+                </div>
+                <div class="text-h5 text-sm-h4 font-weight-black error--text">{{ logStats.today_errors || 0 }}</div>
+                <div class="text-caption grey--text mt-1 hidden-xs-only">4xx/5xx errors today</div>
+              </v-card>
+            </v-col>
+            <v-col cols="6" sm="3">
+              <v-card class="log-kpi-card pa-3 pa-sm-4" elevation="0">
+                <div class="d-flex align-center justify-space-between mb-2">
+                  <span class="text-caption deep-purple--text font-weight-bold">DISK USAGE</span>
+                  <v-avatar color="deep-purple lighten-5" size="32">
+                    <v-icon color="deep-purple" small>mdi-harddisk</v-icon>
+                  </v-avatar>
+                </div>
+                <div class="text-h5 text-sm-h4 font-weight-black deep-purple--text">{{ logStats.total_size_display || '0 B' }}</div>
+                <div class="text-caption grey--text mt-1 hidden-xs-only">Total log storage</div>
+              </v-card>
+            </v-col>
+          </v-row>
+
+          <!-- Log File Browser Table -->
+          <v-card class="table-container-card mb-6" elevation="0">
+            <v-toolbar flat color="transparent" class="px-4 pt-2">
+              <v-icon color="teal" class="mr-2">mdi-folder-open</v-icon>
+              <span class="text-subtitle-1 font-weight-bold text--primary">
+                Daily Log Files ({{ logFiles.length }})
+              </span>
+              <v-spacer></v-spacer>
+              <v-text-field
+                v-model="logFileSearch"
+                prepend-inner-icon="mdi-magnify"
+                label="Search by date..."
+                single-line hide-details outlined dense style="max-width: 260px" class="search-input mr-3"
+              ></v-text-field>
+            </v-toolbar>
+
+            <v-divider></v-divider>
+
+            <v-data-table
+              :headers="logFileHeaders"
+              :items="logFiles"
+              :search="logFileSearch"
+              :loading="loadingLogs"
+              loading-text="Scanning log directory..."
+              class="premium-table log-table"
+              no-data-text="No daily log files found yet. Logs will appear once the server starts receiving API requests."
+              :items-per-page="10"
+              sort-by="date"
+              :sort-desc="true"
+            >
+              <!-- Date Column -->
+              <template v-slot:item.date="{ item }">
+                <div class="d-flex align-center py-2">
+                  <v-avatar size="36" color="teal lighten-5" class="mr-3">
+                    <v-icon color="teal" small>mdi-calendar</v-icon>
+                  </v-avatar>
+                  <div>
+                    <div class="font-weight-bold text-subtitle-2 text--primary">{{ formatLogDate(item.date) }}</div>
+                    <div class="caption grey--text">{{ item.file_name }}</div>
+                  </div>
+                </div>
+              </template>
+
+              <!-- Size Column -->
+              <template v-slot:item.size_display="{ item }">
+                <v-chip small color="blue-grey lighten-5" class="font-weight-bold blue-grey--text text--darken-2" label>
+                  <v-icon left x-small>mdi-weight</v-icon>
+                  {{ item.size_display }}
+                </v-chip>
+              </template>
+
+              <!-- Line Count Column -->
+              <template v-slot:item.line_count="{ item }">
+                <div class="d-flex align-center">
+                  <v-icon small color="grey" class="mr-1">mdi-text-long</v-icon>
+                  <span class="font-weight-bold text-body-2">{{ item.line_count.toLocaleString() }}</span>
+                  <span class="caption grey--text ml-1">lines</span>
+                </div>
+              </template>
+
+              <!-- Last Modified Column -->
+              <template v-slot:item.last_modified="{ item }">
+                <span class="caption grey--text text--darken-2 font-weight-medium">{{ item.last_modified }}</span>
+              </template>
+
+              <!-- Actions Column -->
+              <template v-slot:item.actions="{ item }">
+                <div class="d-flex align-center justify-end" style="gap: 8px">
+                  <v-btn color="teal" x-small class="px-3 rounded-lg font-weight-bold white--text" @click="openLogViewer(item.date)" :loading="viewingLogDate === item.date">
+                    <v-icon left x-small>mdi-eye</v-icon>
+                    View
+                  </v-btn>
+                  <v-btn color="primary" outlined x-small class="px-3 rounded-lg font-weight-bold" @click="downloadLog(item.date)">
+                    <v-icon left x-small>mdi-download</v-icon>
+                    Download
+                  </v-btn>
+                </div>
+              </template>
+            </v-data-table>
+          </v-card>
+
+          <!-- Log Viewer Dialog (Full Screen Premium) -->
+          <v-dialog v-model="logViewerDialog" fullscreen hide-overlay transition="dialog-bottom-transition">
+            <v-card style="background: #F8FAFC;">
+              <!-- Top Toolbar -->
+              <v-toolbar dark color="#0F172A" flat class="px-4">
+                <v-btn icon dark @click="logViewerDialog = false">
+                  <v-icon>mdi-close</v-icon>
+                </v-btn>
+                <v-toolbar-title class="d-flex align-center">
+                  <v-icon color="teal lighten-2" class="mr-2">mdi-file-document</v-icon>
+                  <span class="font-weight-bold">Log Viewer</span>
+                  <v-chip color="teal darken-3" dark small label class="ml-3 font-weight-bold">{{ viewingLogDate }}</v-chip>
+                </v-toolbar-title>
+                <v-spacer></v-spacer>
+                <v-btn color="teal" small class="mr-2 font-weight-bold" @click="downloadLog(viewingLogDate)">
+                  <v-icon left small>mdi-download</v-icon>
+                  Download .txt
+                </v-btn>
+                <v-chip color="white" outlined small label class="font-weight-bold">
+                  <v-icon left x-small color="white">mdi-chart-bar</v-icon>
+                  {{ logViewData.total_requests || 0 }} requests
+                </v-chip>
+              </v-toolbar>
+
+              <v-container fluid style="max-width: 1400px" class="py-6">
+                <!-- Analytics Cards Row -->
+                <v-row class="mb-6" dense>
+                  <v-col cols="6" md="3">
+                    <v-card class="log-analytics-card pa-4" elevation="0">
+                      <div class="caption teal--text font-weight-bold mb-1">TOTAL REQUESTS</div>
+                      <div class="text-h4 font-weight-black teal--text">{{ logViewData.total_requests || 0 }}</div>
+                    </v-card>
+                  </v-col>
+                  <v-col cols="6" md="3">
+                    <v-card class="log-analytics-card pa-4" elevation="0">
+                      <div class="caption error--text font-weight-bold mb-1">ERRORS (4xx/5xx)</div>
+                      <div class="text-h4 font-weight-black error--text">{{ logViewData.error_count || 0 }}</div>
+                    </v-card>
+                  </v-col>
+                  <v-col cols="6" md="3">
+                    <v-card class="log-analytics-card pa-4" elevation="0">
+                      <div class="caption primary--text font-weight-bold mb-1">SUCCESS RATE</div>
+                      <div class="text-h4 font-weight-black primary--text">{{ successRate }}%</div>
+                    </v-card>
+                  </v-col>
+                  <v-col cols="6" md="3">
+                    <v-card class="log-analytics-card pa-4" elevation="0">
+                      <div class="caption deep-purple--text font-weight-bold mb-1">UNIQUE APIs</div>
+                      <div class="text-h4 font-weight-black deep-purple--text">{{ logViewData.top_apis ? logViewData.top_apis.length : 0 }}</div>
+                    </v-card>
+                  </v-col>
+                </v-row>
+
+                <!-- API Analytics & Method Breakdown -->
+                <v-row class="mb-6" dense>
+                  <!-- Top APIs -->
+                  <v-col cols="12" md="7">
+                    <v-card class="pa-5 rounded-xl" elevation="0" style="border: 1px solid #E2E8F0; background: white;">
+                      <div class="d-flex align-center mb-4">
+                        <v-icon color="teal" class="mr-2">mdi-api</v-icon>
+                        <span class="text-subtitle-1 font-weight-bold text--primary">Top API Endpoints</span>
+                      </div>
+                      <div v-if="logViewData.top_apis && logViewData.top_apis.length">
+                        <div v-for="(api, idx) in logViewData.top_apis" :key="idx" class="d-flex align-center justify-space-between py-2" :class="{ 'border-bottom': idx < logViewData.top_apis.length - 1 }" style="border-bottom: 1px solid #F1F5F9">
+                          <div class="d-flex align-center">
+                            <v-avatar size="24" :color="apiRankColor(idx)" class="mr-3 white--text font-weight-bold caption">
+                              {{ idx + 1 }}
+                            </v-avatar>
+                            <code class="text-body-2 font-weight-medium">{{ api.path }}</code>
+                          </div>
+                          <div class="d-flex align-center">
+                            <v-progress-linear :value="(api.count / maxApiCount) * 100" :color="apiRankColor(idx)" height="6" rounded style="width: 80px" class="mr-3"></v-progress-linear>
+                            <span class="font-weight-bold text-body-2 text--primary" style="min-width: 35px; text-align: right">{{ api.count }}</span>
+                          </div>
+                        </div>
+                      </div>
+                      <div v-else class="text-center py-6 grey--text">
+                        <v-icon color="grey lighten-1" size="40">mdi-chart-bar</v-icon>
+                        <div class="mt-2 caption">No API data to display</div>
+                      </div>
+                    </v-card>
+                  </v-col>
+
+                  <!-- Method & Status Breakdown -->
+                  <v-col cols="12" md="5">
+                    <v-card class="pa-5 rounded-xl mb-4" elevation="0" style="border: 1px solid #E2E8F0; background: white;">
+                      <div class="d-flex align-center mb-3">
+                        <v-icon color="indigo" class="mr-2" small>mdi-swap-horizontal</v-icon>
+                        <span class="text-subtitle-2 font-weight-bold text--primary">HTTP Methods</span>
+                      </div>
+                      <div v-if="logViewData.method_counts" class="d-flex flex-wrap" style="gap: 8px">
+                        <v-chip v-for="(count, method) in logViewData.method_counts" :key="method" :color="methodColor(method)" dark small class="font-weight-bold">
+                          {{ method }}: {{ count }}
+                        </v-chip>
+                      </div>
+                      <div v-else class="caption grey--text">No data</div>
+                    </v-card>
+                    <v-card class="pa-5 rounded-xl" elevation="0" style="border: 1px solid #E2E8F0; background: white;">
+                      <div class="d-flex align-center mb-3">
+                        <v-icon color="amber darken-2" class="mr-2" small>mdi-traffic-light</v-icon>
+                        <span class="text-subtitle-2 font-weight-bold text--primary">Status Codes</span>
+                      </div>
+                      <div v-if="logViewData.status_counts" class="d-flex flex-wrap" style="gap: 8px">
+                        <v-chip v-for="(count, status) in logViewData.status_counts" :key="status" :color="statusColor(status)" dark small class="font-weight-bold">
+                          {{ status }}: {{ count }}
+                        </v-chip>
+                      </div>
+                      <div v-else class="caption grey--text">No data</div>
+                    </v-card>
+                  </v-col>
+                </v-row>
+
+                <!-- Raw Log Terminal Console -->
+                <v-card class="pa-0 rounded-xl overflow-hidden" elevation="0" style="border: 1px solid #1E293B;">
+                  <div class="d-flex align-center justify-space-between px-5 py-3" style="background: #0F172A;">
+                    <div class="d-flex align-center">
+                      <div class="d-flex mr-3" style="gap: 6px">
+                        <div style="width: 12px; height: 12px; border-radius: 50%; background: #EF4444;"></div>
+                        <div style="width: 12px; height: 12px; border-radius: 50%; background: #F59E0B;"></div>
+                        <div style="width: 12px; height: 12px; border-radius: 50%; background: #10B981;"></div>
+                      </div>
+                      <v-icon color="green lighten-2" small class="mr-2">mdi-console-line</v-icon>
+                      <span class="text-subtitle-2 font-weight-bold white--text">Raw Log Output</span>
+                      <span class="caption grey--text ml-3">{{ logViewData.file_name }}</span>
+                    </div>
+                    <div class="d-flex align-center" style="gap: 8px">
+                      <v-text-field
+                        v-model="logContentSearch"
+                        prepend-inner-icon="mdi-magnify"
+                        placeholder="Filter logs..."
+                        single-line hide-details outlined dense dark
+                        style="max-width: 220px; font-size: 12px;"
+                        class="log-filter-input"
+                      ></v-text-field>
+                      <v-chip color="grey darken-3" dark x-small label class="font-weight-bold">
+                        {{ filteredLogEntries.length }} / {{ (logViewData.entries || []).length }} lines
+                      </v-chip>
+                    </div>
+                  </div>
+                  <div class="log-console-body" style="background: #020617; max-height: 500px; overflow-y: auto; font-family: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace; font-size: 12px; line-height: 1.6;">
+                    <div v-for="(entry, idx) in filteredLogEntries" :key="idx" class="log-line d-flex px-4 py-1" :class="logLineClass(entry)" style="border-bottom: 1px solid rgba(255,255,255,0.03);">
+                      <span class="grey--text text--darken-1 mr-3" style="min-width: 40px; text-align: right; user-select: none;">{{ idx + 1 }}</span>
+                      <span v-if="entry.timestamp" class="log-timestamp mr-2">{{ entry.timestamp }}</span>
+                      <span v-if="entry.method" class="log-method mr-2" :class="'method-' + (entry.method || '').toLowerCase()">{{ entry.method }}</span>
+                      <span v-if="entry.path" class="log-path mr-2">{{ entry.path }}</span>
+                      <span v-if="entry.status" class="log-status mr-2" :class="'status-' + (entry.status || '')[0] + 'xx'">{{ entry.status }}</span>
+                      <span v-if="entry.duration" class="log-duration mr-2">{{ entry.duration }}</span>
+                      <span v-if="entry.remote_addr" class="log-ip">{{ entry.remote_addr }}</span>
+                      <span v-if="!entry.timestamp" class="grey--text">{{ entry.raw }}</span>
+                    </div>
+                    <div v-if="filteredLogEntries.length === 0" class="text-center py-8">
+                      <v-icon color="grey darken-2" size="40">mdi-file-document-outline</v-icon>
+                      <div class="grey--text text--darken-1 mt-2 caption">No log entries match your filter</div>
+                    </div>
+                  </div>
+                </v-card>
+              </v-container>
+            </v-card>
+          </v-dialog>
+        </div>
       </div>
     </v-container>
   </div>
@@ -645,6 +972,22 @@ export default {
         { time: new Date().toLocaleTimeString(), type: 'info', text: '🌌 K8S CLUSTER VISUALIZER: Connected to cluster node.' },
         { time: new Date().toLocaleTimeString(), type: 'info', text: '✅ REPLICASET CONTROLLER: 4/4 Desired pods active and healthy.' }
       ],
+      // Log Viewer state
+      logFiles: [],
+      logStats: {},
+      loadingLogs: false,
+      logFileSearch: '',
+      logViewerDialog: false,
+      viewingLogDate: null,
+      logViewData: {},
+      logContentSearch: '',
+      logFileHeaders: [
+        { text: 'DATE', value: 'date', sortable: true },
+        { text: 'FILE SIZE', value: 'size_display', sortable: true },
+        { text: 'LOG ENTRIES', value: 'line_count', sortable: true },
+        { text: 'LAST MODIFIED', value: 'last_modified', sortable: true },
+        { text: 'ACTIONS', value: 'actions', sortable: false, align: 'end' }
+      ],
       topologyComponents: [
         { component: 'postgres', serviceName: 'postgres-svc', port: '5432', icon: 'mdi-database', color: '#60A5FA', bg: 'blue lighten-5' },
         { component: 'redis', serviceName: 'redis-svc', port: '6379', icon: 'mdi-database-clock', color: '#F87171', bg: 'red lighten-5' },
@@ -674,6 +1017,8 @@ export default {
         this.fetchRedisData()
       } else if (val === 2) {
         this.fetchK8sData()
+      } else if (val === 3) {
+        this.fetchLogFiles()
       }
     }
   },
@@ -705,6 +1050,26 @@ export default {
           isCreating
         }
       })
+    },
+    filteredLogEntries() {
+      if (!this.logViewData.entries) return []
+      if (!this.logContentSearch) return this.logViewData.entries
+      const q = this.logContentSearch.toLowerCase()
+      return this.logViewData.entries.filter(e => {
+        return (e.raw || '').toLowerCase().includes(q) ||
+               (e.path || '').toLowerCase().includes(q) ||
+               (e.method || '').toLowerCase().includes(q) ||
+               (e.status || '').toLowerCase().includes(q)
+      })
+    },
+    successRate() {
+      if (!this.logViewData.total_requests) return 100
+      const errors = this.logViewData.error_count || 0
+      return ((1 - errors / this.logViewData.total_requests) * 100).toFixed(1)
+    },
+    maxApiCount() {
+      if (!this.logViewData.top_apis || !this.logViewData.top_apis.length) return 1
+      return this.logViewData.top_apis[0].count || 1
     }
   },
   methods: {
@@ -902,6 +1267,87 @@ export default {
     formatDate(d) {
       if (!d) return '-'
       return new Date(d).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+    },
+    // ─── Log Viewer Methods ────────────────────────────────────────
+    async fetchLogFiles() {
+      this.loadingLogs = true
+      try {
+        const res = await registrationService.getLogFiles(this.adminToken)
+        this.logFiles = res.data.data.files || []
+        this.logStats = res.data.data.stats || {}
+      } catch (e) {
+        console.error('Failed to fetch log files', e)
+      } finally {
+        this.loadingLogs = false
+      }
+    },
+    async openLogViewer(date) {
+      this.viewingLogDate = date
+      this.logContentSearch = ''
+      try {
+        const res = await registrationService.viewLogFile(date, this.adminToken)
+        this.logViewData = res.data.data || {}
+        this.logViewerDialog = true
+      } catch (e) {
+        alert(e.response?.data?.message || 'Failed to load log file')
+      } finally {
+        this.viewingLogDate = null
+      }
+    },
+    downloadLog(date) {
+      const url = registrationService.getLogDownloadURL(date, this.adminToken)
+      // We need to fetch with auth, then trigger download
+      const a = document.createElement('a')
+      a.href = url
+      a.target = '_blank'
+      a.download = `crm-${date}.txt`
+      // Since it's auth protected, do an XHR download
+      const xhr = new XMLHttpRequest()
+      xhr.open('GET', url, true)
+      xhr.setRequestHeader('Authorization', `Bearer ${this.adminToken}`)
+      xhr.responseType = 'blob'
+      xhr.onload = () => {
+        if (xhr.status === 200) {
+          const blob = new Blob([xhr.response], { type: 'text/plain' })
+          const link = document.createElement('a')
+          link.href = window.URL.createObjectURL(blob)
+          link.download = `crm-${date}.txt`
+          link.click()
+          window.URL.revokeObjectURL(link.href)
+        }
+      }
+      xhr.send()
+    },
+    formatLogDate(dateStr) {
+      if (!dateStr) return '-'
+      try {
+        const d = new Date(dateStr + 'T00:00:00')
+        return d.toLocaleDateString('en-IN', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' })
+      } catch {
+        return dateStr
+      }
+    },
+    logLineClass(entry) {
+      if (!entry.status) return ''
+      const s = entry.status[0]
+      if (s === '4' || s === '5') return 'log-line-error'
+      if (s === '3') return 'log-line-redirect'
+      return 'log-line-success'
+    },
+    apiRankColor(idx) {
+      const colors = ['teal', 'primary', 'indigo', 'deep-purple', 'blue-grey', 'grey darken-1', 'grey', 'grey lighten-1', 'grey lighten-1', 'grey lighten-1']
+      return colors[idx] || 'grey'
+    },
+    methodColor(method) {
+      const colors = { GET: '#10B981', POST: '#3B82F6', PUT: '#F59E0B', DELETE: '#EF4444', PATCH: '#8B5CF6', OPTIONS: '#6B7280', HEAD: '#6B7280' }
+      return colors[method] || '#6B7280'
+    },
+    statusColor(status) {
+      if (status.startsWith('2')) return '#10B981'
+      if (status.startsWith('3')) return '#3B82F6'
+      if (status.startsWith('4')) return '#F59E0B'
+      if (status.startsWith('5')) return '#EF4444'
+      return '#6B7280'
     }
   }
 }
@@ -1012,6 +1458,100 @@ export default {
 .console-line.error { color: #F87171; }
 .console-line.success { color: #4ADE80; }
 
+/* ─── LOG VIEWER STYLES ─────────────────────────────────────── */
+.log-kpi-card {
+  border-radius: 14px !important;
+  background: white;
+  border: 1px solid #E2E8F0;
+  transition: all 0.25s ease;
+}
+.log-kpi-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 10px 30px rgba(0,0,0,0.08) !important;
+}
+.log-analytics-card {
+  border-radius: 16px !important;
+  background: white;
+  border: 1px solid #E2E8F0;
+  transition: all 0.2s ease;
+}
+.log-analytics-card:hover {
+  box-shadow: 0 6px 20px rgba(0,0,0,0.06) !important;
+}
+.log-table >>> td {
+  border-bottom: 1px solid #F1F5F9 !important;
+  cursor: default;
+}
+.log-console-body {
+  scrollbar-width: thin;
+  scrollbar-color: #334155 #0F172A;
+}
+.log-console-body::-webkit-scrollbar {
+  width: 6px;
+}
+.log-console-body::-webkit-scrollbar-track {
+  background: #0F172A;
+}
+.log-console-body::-webkit-scrollbar-thumb {
+  background: #334155;
+  border-radius: 3px;
+}
+.log-line {
+  transition: background 0.15s ease;
+}
+.log-line:hover {
+  background: rgba(255, 255, 255, 0.04) !important;
+}
+.log-line-error {
+  background: rgba(239, 68, 68, 0.06) !important;
+}
+.log-line-error:hover {
+  background: rgba(239, 68, 68, 0.12) !important;
+}
+.log-line-redirect {
+  background: rgba(59, 130, 246, 0.04) !important;
+}
+.log-timestamp {
+  color: #64748B;
+  font-weight: 500;
+}
+.log-method {
+  font-weight: 700;
+  min-width: 50px;
+}
+.method-get { color: #10B981; }
+.method-post { color: #3B82F6; }
+.method-put { color: #F59E0B; }
+.method-delete { color: #EF4444; }
+.method-patch { color: #8B5CF6; }
+.method-options { color: #6B7280; }
+.log-path {
+  color: #E2E8F0;
+  font-weight: 500;
+}
+.log-status {
+  font-weight: 800;
+  min-width: 30px;
+}
+.status-2xx { color: #10B981; }
+.status-3xx { color: #60A5FA; }
+.status-4xx { color: #FBBF24; }
+.status-5xx { color: #F87171; }
+.log-duration {
+  color: #94A3B8;
+  font-weight: 500;
+}
+.log-ip {
+  color: #475569;
+  font-size: 11px;
+}
+.log-filter-input >>> .v-input__control {
+  border-radius: 8px !important;
+}
+.border-bottom {
+  border-bottom: 1px solid #F1F5F9;
+}
+
 @media (max-width: 600px) {
   .admin-bg {
     padding: 12px 6px !important;
@@ -1032,6 +1572,10 @@ export default {
   .code-input >>> input {
     font-size: 16px !important;
     letter-spacing: 4px !important;
+  }
+  .log-kpi-card,
+  .log-analytics-card {
+    padding: 12px !important;
   }
 }
 </style>
