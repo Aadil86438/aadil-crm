@@ -13,24 +13,18 @@ import (
 
 // UserHandler handles user management HTTP requests
 type UserHandler struct {
-	userRepo    *repositories.UserRepository
-	accountRepo *repositories.AccountRepository
-	contactRepo *repositories.ContactRepository
-	auditRepo   *repositories.AuditRepository
+	userRepo  *repositories.UserRepository
+	auditRepo *repositories.AuditRepository
 }
 
 // NewUserHandler creates a new UserHandler
 func NewUserHandler(
 	userRepo *repositories.UserRepository,
-	accountRepo *repositories.AccountRepository,
-	contactRepo *repositories.ContactRepository,
 	auditRepo *repositories.AuditRepository,
 ) *UserHandler {
 	return &UserHandler{
-		userRepo:    userRepo,
-		accountRepo: accountRepo,
-		contactRepo: contactRepo,
-		auditRepo:   auditRepo,
+		userRepo:  userRepo,
+		auditRepo: auditRepo,
 	}
 }
 
@@ -235,28 +229,18 @@ func (h *AuditHandler) List(w http.ResponseWriter, r *http.Request) {
 	utils.Paginated(w, logs, total, page, pageSize)
 }
 
-// ListAccountsSimple handles GET /api/accounts/simple
-func (h *AccountHandler) ListSimple(w http.ResponseWriter, r *http.Request) {
-	accounts, err := h.accountRepo.ListSimple()
-	if err != nil {
-		utils.InternalServerError(w, "Failed to fetch accounts")
-		return
+// extractID extracts an ID parameter from a URL path given a prefix
+func extractID(path, prefix string) string {
+	if len(path) <= len(prefix) {
+		return ""
 	}
-	if accounts == nil {
-		accounts = []*models.Account{}
-	}
-	utils.Success(w, accounts)
+	return path[len(prefix):]
 }
 
-// ListContactsSimple handles GET /api/contacts/simple
-func (h *ContactHandler) ListSimple(w http.ResponseWriter, r *http.Request) {
-	contacts, err := h.contactRepo.ListSimple()
-	if err != nil {
-		utils.InternalServerError(w, "Failed to fetch contacts")
-		return
+// extractIDWithSuffix extracts an ID parameter from a URL path with prefix and suffix
+func extractIDWithSuffix(path, prefix, suffix string) string {
+	if len(path) <= len(prefix)+len(suffix) {
+		return ""
 	}
-	if contacts == nil {
-		contacts = []*models.Contact{}
-	}
-	utils.Success(w, contacts)
+	return path[len(prefix) : len(path)-len(suffix)]
 }

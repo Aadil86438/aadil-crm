@@ -16,12 +16,6 @@ type SMTPConfig struct {
 	From     string
 }
 
-// RazorpayConfig holds Razorpay payment gateway settings
-type RazorpayConfig struct {
-	KeyID     string
-	KeySecret string
-}
-
 // HealthReportConfig holds configuration for the daily health report
 type HealthReportConfig struct {
 	Enabled   bool
@@ -39,7 +33,6 @@ type Config struct {
 	FrontendURL  string
 	SMTP         SMTPConfig
 	HealthReport HealthReportConfig
-	Razorpay     RazorpayConfig
 }
 
 // RedisConfig holds Redis connection settings
@@ -105,10 +98,6 @@ func Load() *Config {
 			Username: getEnv("SMTP_USERNAME", ""),
 			Password: getEnv("SMTP_PASSWORD", ""),
 			From:     getEnv("SMTP_FROM", ""),
-		},
-		Razorpay: RazorpayConfig{
-			KeyID:     getEnv("RAZORPAY_KEY_ID", ""),
-			KeySecret: getEnv("RAZORPAY_KEY_SECRET", ""),
 		},
 		HealthReport: HealthReportConfig{
 			Enabled:   reportEnabled,

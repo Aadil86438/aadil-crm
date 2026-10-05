@@ -83,66 +83,6 @@
 
       <v-spacer />
 
-      <!-- Global Search Bar -->
-      <div class="search-container mr-3" :class="$vuetify.breakpoint.xs ? 'd-none' : ''">
-        <v-text-field
-          v-model="searchQuery"
-          placeholder="Search leads, contacts, deals..."
-          prepend-inner-icon="mdi-magnify"
-          dense
-          outlined
-          hide-details
-          class="search-field"
-          style="width: 300px;"
-          @keyup.enter="goSearch"
-          @input="onSearchInput"
-          clearable
-          id="global-search"
-        >
-          <!-- Search Results Dropdown -->
-          <template v-slot:append v-if="searchResults && searchQuery">
-            <v-menu v-model="searchMenu" :close-on-click="true" offset-y>
-              <template v-slot:activator="{ on }"></template>
-            </v-menu>
-          </template>
-        </v-text-field>
-
-        <!-- Search dropdown -->
-        <v-card v-if="searchMenu && searchResults" class="search-dropdown elevation-8" width="400">
-          <v-list dense>
-            <template v-for="(items, category) in filteredResults">
-              <template v-if="items && items.length > 0">
-                <v-subheader :key="'header-'+category" class="text-caption font-weight-bold">{{ categoryLabel(category) }}</v-subheader>
-                <v-list-item
-                  v-for="item in items"
-                  :key="item.id"
-                  @click="navigateToResult(item)"
-                  class="py-0"
-                >
-                  <v-list-item-icon class="mr-3">
-                    <v-icon small :color="typeColor(item.type)">{{ typeIcon(item.type) }}</v-icon>
-                  </v-list-item-icon>
-                  <v-list-item-content>
-                    <v-list-item-title class="text-body-2">{{ item.title }}</v-list-item-title>
-                    <v-list-item-subtitle class="text-caption">{{ item.subtitle }}</v-list-item-subtitle>
-                  </v-list-item-content>
-                </v-list-item>
-              </template>
-            </template>
-            <v-list-item @click="goSearch" class="py-2">
-              <v-list-item-content>
-                <v-list-item-title class="text-caption primary--text text-center">View all results →</v-list-item-title>
-              </v-list-item-content>
-            </v-list-item>
-          </v-list>
-        </v-card>
-      </div>
-
-      <!-- Mobile Search -->
-      <v-btn icon v-if="$vuetify.breakpoint.xs" @click="$router.push('/search')">
-        <v-icon>mdi-magnify</v-icon>
-      </v-btn>
-
       <!-- User Menu -->
       <v-menu offset-y left>
         <template v-slot:activator="{ on, attrs }">
@@ -182,7 +122,6 @@
 
 <script>
 import { mapGetters, mapActions } from 'vuex'
-import searchService from '../services/searchService'
 
 export default {
   name: 'MainLayout',
@@ -190,22 +129,11 @@ export default {
     return {
       drawer: true,
       miniVariant: false,
-      searchQuery: '',
-      searchResults: null,
-      searchMenu: false,
-      searchTimer: null,
       navItems: [
         { title: 'Dashboard', icon: 'mdi-view-dashboard', to: '/' },
-        { title: 'Leads', icon: 'mdi-account-arrow-right', to: '/leads' },
-        { title: 'Contacts', icon: 'mdi-contacts', to: '/contacts' },
-        { title: 'Accounts', icon: 'mdi-office-building', to: '/accounts' },
-        { title: 'Deals', icon: 'mdi-briefcase', to: '/deals' },
-        { title: 'Tasks', icon: 'mdi-checkbox-marked-circle', to: '/tasks' },
-        { title: 'Activities', icon: 'mdi-timeline', to: '/activities' },
-        { title: 'Calendar', icon: 'mdi-calendar', to: '/calendar' },
-        { title: 'Reports', icon: 'mdi-chart-bar', to: '/reports' },
-        { title: 'Users', icon: 'mdi-account-group', to: '/users' },
-        { title: 'Audit Log', icon: 'mdi-shield-check', to: '/audit-log', hidden: true },
+        { title: 'Employee Directory', icon: 'mdi-account-group', to: '/users' },
+        { title: 'Employee Tasks', icon: 'mdi-checkbox-marked-circle', to: '/tasks' },
+        { title: 'Work Activities', icon: 'mdi-timeline', to: '/activities' },
       ]
     }
   },
@@ -221,74 +149,13 @@ export default {
     roleLabel() {
       const map = { admin: 'Admin', manager: 'Manager', sales_user: 'Team Member' }
       return map[this.currentUser.role] || 'User'
-    },
-    filteredResults() {
-      if (!this.searchResults) return {}
-      return {
-        leads: this.searchResults.leads || [],
-        contacts: this.searchResults.contacts || [],
-        accounts: this.searchResults.accounts || [],
-        deals: this.searchResults.deals || [],
-      }
     }
   },
   methods: {
     ...mapActions('auth', ['logout']),
     async logout() {
       await this.$store.dispatch('auth/logout')
-    },
-    onSearchInput() {
-      clearTimeout(this.searchTimer)
-      if (!this.searchQuery || this.searchQuery.length < 2) {
-        this.searchMenu = false
-        this.searchResults = null
-        return
-      }
-      this.searchTimer = setTimeout(async () => {
-        try {
-          const res = await searchService.search(this.searchQuery)
-          this.searchResults = res.data.data
-          this.searchMenu = true
-        } catch (e) { /* ignore */ }
-      }, 300)
-    },
-    goSearch() {
-      this.searchMenu = false
-      if (this.searchQuery) {
-        this.$router.push({ name: 'Search', query: { q: this.searchQuery } })
-      }
-    },
-    navigateToResult(item) {
-      this.searchMenu = false
-      this.searchQuery = ''
-      const routes = {
-        lead: `/leads/${item.id}`,
-        contact: `/contacts/${item.id}`,
-        account: `/accounts/${item.id}`,
-        deal: `/deals/${item.id}`,
-      }
-      if (routes[item.type]) this.$router.push(routes[item.type])
-    },
-    categoryLabel(cat) {
-      const map = { leads: 'LEADS', contacts: 'CONTACTS', accounts: 'ACCOUNTS', deals: 'DEALS', tasks: 'TASKS' }
-      return map[cat] || cat.toUpperCase()
-    },
-    typeIcon(type) {
-      const icons = { lead: 'mdi-account-arrow-right', contact: 'mdi-contacts', account: 'mdi-office-building', deal: 'mdi-briefcase', task: 'mdi-checkbox-marked-circle' }
-      return icons[type] || 'mdi-circle'
-    },
-    typeColor(type) {
-      const colors = { lead: 'orange', contact: 'blue', account: 'green', deal: 'purple', task: 'teal' }
-      return colors[type] || 'grey'
     }
-  },
-  mounted() {
-    // Close search dropdown when clicking outside
-    document.addEventListener('click', e => {
-      if (!this.$el.contains(e.target)) {
-        this.searchMenu = false
-      }
-    })
   }
 }
 </script>

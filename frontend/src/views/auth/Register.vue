@@ -164,8 +164,10 @@ export default {
       this.error = null
       try {
         const res = await registrationService.register(this.form)
-        const regId = res.data.data.id
-        this.$router.push({ name: 'Payment', params: { id: regId }, query: { name: this.form.name, company: this.form.company_name } })
+        const authData = res.data.data
+        // Store auth state and redirect directly to dashboard
+        this.$store.commit('auth/SET_AUTH', authData)
+        this.$router.push('/dashboard')
       } catch (err) {
         this.error = err.response?.data?.message || 'Registration failed. Please try again.'
       } finally {
