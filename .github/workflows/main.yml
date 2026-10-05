@@ -161,33 +161,11 @@ jobs:
         run: go mod download
         working-directory: backend
 
-      # Step 2.6 — Install FOSSA CLI tool
-      # FOSSA provides a shell script that downloads their CLI binary.
-      # This is the official way to install FOSSA in CI.
-      - name: 🛠️ Install FOSSA CLI
-        run: curl -H 'Cache-Control: no-cache' https://raw.githubusercontent.com/fossas/fossa-cli/master/install-latest.sh | bash
-
-      # Step 2.7 — Run FOSSA Analysis
-      # "fossa analyze" reads .fossa.yml, scans both frontend and backend,
-      # then uploads the dependency manifest to app.fossa.com
-      #
-      # FOSSA_API_KEY is your secret from app.fossa.com
-      # Without it, FOSSA can't authenticate and upload results
+      # Step 2.6 — Run FOSSA Analysis & Test
       - name: 🔍 Run FOSSA dependency & license analysis
-        run: fossa analyze
-        env:
-          FOSSA_API_KEY: ${{ secrets.FOSSA_API_KEY }}  # YOUR secret from app.fossa.com
-
-      # Step 2.8 — Check/Test the FOSSA results
-      # "fossa test" checks the uploaded scan against your configured policies.
-      # If a license violation OR CVE is found → this FAILS → deploy is blocked.
-      #
-      # Example policy: "Block any GPL-licensed dependency"
-      # If axios suddenly had a GPL license → this step catches it
-      - name: ✅ Check FOSSA compliance results (fails if violation found)
-        run: fossa test
-        env:
-          FOSSA_API_KEY: ${{ secrets.FOSSA_API_KEY }}
+        uses: fossa-contrib/fossa-action@v3
+        with:
+          api-key: ${{ secrets.FOSSA_API_KEY }}
 
       # After this step, go to https://app.fossa.com to see full license report!
 
