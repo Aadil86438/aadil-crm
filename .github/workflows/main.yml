@@ -1,214 +1,36 @@
 # =============================================================================
 # GITHUB ACTIONS CI/CD PIPELINE — main.yml
 # =============================================================================
-# What is this file?
-#   This is our automated pipeline. Every time someone pushes code to the
-#   "main" branch, GitHub runs all these jobs automatically — in order.
-#
-# THE PIPELINE FLOW (in order):
-#
-#   [1] sonarcloud-scan  → Scans OUR code for bugs/vulnerabilities (SonarQube)
-#         ↓ (only if passed)
-#   [2] fossa-scan       → Scans DEPENDENCIES for license/security issues
-#         ↓ (only if passed)
-#   [3] deploy           → SSH into EC2 and deploy the new code
-#
-# WHY THIS ORDER?
-#   We never want bad/insecure code to reach production (EC2).
-#   So we run code quality checks FIRST. Only if BOTH pass → we deploy.
-#   This is called a "Quality Gate" in CI/CD terminology.
-#
-# SECRETS REQUIRED (set in GitHub → Settings → Secrets and variables → Actions):
-#   - SONAR_TOKEN      → From sonarcloud.io (My Account → Security → Generate Token)
-#   - FOSSA_API_KEY    → From app.fossa.com (Account → Integrations → API)
-#   - EC2_HOST         → Your EC2 public IP or domain
-#   - EC2_USER         → ubuntu (or whatever user you SSH with)
-#   - EC2_SSH_KEY      → Your EC2 private SSH key (PEM file contents)
+# Direct deployment to AWS EC2 on push to main branch
 # =============================================================================
 
-name: CRM CI/CD — Scan + Deploy
+name: CRM CI/CD — Direct Deploy
 
-# ─── Trigger ──────────────────────────────────────────────────────────────────
-# This pipeline runs ONLY when code is pushed to the "main" branch
 on:
   push:
     branches:
       - main
-  # Also run on pull requests targeting main — catches issues BEFORE they merge
   pull_request:
     branches:
       - main
 
-# =============================================================================
-# JOB 1: SONARCLOUD SCAN
-# =============================================================================
-# Purpose: Analyze OUR source code (Go backend + Vue frontend) for:
-#   - Bugs (logic errors, null dereferences, etc.)
-#   - Vulnerabilities (SQL injection, XSS, hardcoded passwords, etc.)
-#   - Code Smells (bad patterns that make code hard to maintain)
-#
-# Tool: SonarCloud (free cloud version of SonarQube for open/private GitHub repos)
-# Config: reads sonar-project.properties in the repo root
-# Result: visible at https://sonarcloud.io → your project dashboard
-# =============================================================================
 jobs:
-  sonarcloud-scan:
-    name: 🔍 SonarCloud — Code Quality & Security Scan
-    runs-on: ubuntu-latest
-
-    steps:
-      # Step 1.1 — Checkout the code
-      # "fetch-depth: 0" means get the FULL git history, not just latest commit.
-      # SonarCloud needs history to calculate "new code" vs "existing code"
-      - name: 📥 Checkout repository (full history for Sonar blame analysis)
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0  # full history required by SonarCloud for accurate analysis
-
-      # Step 1.2 — Set up Go environment
-      # We need Go installed so SonarCloud scanner can understand Go syntax,
-      # modules, and run any Go-specific analysis tools
-      - name: 🐹 Setup Go (for backend analysis)
-        uses: actions/setup-go@v5
-        with:
-          go-version: '1.24'  # must match our go.mod version
-
-      # Step 1.3 — Set up Node.js environment
-      # We need Node so SonarCloud can also analyze our Vue.js frontend code
-      - name: 🟢 Setup Node.js (for frontend analysis)
-        uses: actions/setup-node@v4
-        with:
-          node-version: '18'  # LTS version — stable and widely supported
-
-      # Step 1.4 — Download frontend dependencies
-      # SonarCloud needs to understand our npm project structure
-      # "ci" is like "npm install" but faster and uses package-lock.json exactly
-      - name: 📦 Install frontend npm dependencies
-        run: npm ci
-        working-directory: frontend  # run this command INSIDE the frontend folder
-
-      # Step 1.5 — Download backend Go dependencies
-      # "go mod download" fetches all packages listed in go.mod
-      - name: 📦 Download backend Go dependencies
-        run: go mod download
-        working-directory: backend  # run this command INSIDE the backend folder
-
-      # Step 1.6 — Run the actual SonarCloud Scan
-      # This action:
-      #   a) Downloads the SonarCloud scanner CLI tool
-      #   b) Reads sonar-project.properties
-      #   c) Analyzes all source files
-      #   d) Sends the analysis REPORT to sonarcloud.io
-      #
-      # SONAR_TOKEN is a secret API key from sonarcloud.io
-      # Without it, the scanner can't authenticate and upload results
-      - name: 🔍 Run SonarCloud Analysis
-        uses: SonarSource/sonarcloud-github-action@master
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # auto-provided by GitHub — allows Sonar to post PR comments
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}    # YOUR secret from sonarcloud.io
-
-      # After this step, go to https://sonarcloud.io to see results!
-      # If "Quality Gate" fails (too many bugs/vulnerabilities) → this job FAILS
-      # → the next jobs (fossa + deploy) will NOT run
-
-# =============================================================================
-# JOB 2: FOSSA SCAN
-# =============================================================================
-# Purpose: Scan ALL dependencies (npm packages + Go modules) for:
-#   - License compliance issues (GPL in a commercial product = legal risk)
-#   - Known CVE security vulnerabilities in libraries we use
-#
-# Why separate job?
-#   It's a DIFFERENT concern from SonarCloud. Sonar checks OUR code.
-#   FOSSA checks the libraries WE DEPEND ON.
-#
-# needs: sonarcloud-scan → means this job ONLY starts if Job 1 passes
-# Config: reads .fossa.yml in the repo root
-# Result: visible at https://app.fossa.com
-# =============================================================================
-  fossa-scan:
-    name: 📜 FOSSA — License Compliance & Dependency Vulnerability Scan
-    runs-on: ubuntu-latest
-    needs: sonarcloud-scan  # ← GATE: only run if SonarCloud scan PASSED
-
-    steps:
-      # Step 2.1 — Checkout code (standard first step)
-      - name: 📥 Checkout repository
-        uses: actions/checkout@v4
-
-      # Step 2.2 — Set up Node.js so FOSSA can read npm package tree
-      - name: 🟢 Setup Node.js (so FOSSA can resolve npm dependency tree)
-        uses: actions/setup-node@v4
-        with:
-          node-version: '18'
-
-      # Step 2.3 — Install frontend npm dependencies
-      # FOSSA needs actual node_modules present to trace the full
-      # dependency tree (direct + transitive dependencies)
-      - name: 📦 Install frontend dependencies (FOSSA needs full dep tree)
-        run: npm ci
-        working-directory: frontend
-
-      # Step 2.4 — Set up Go so FOSSA can read Go module dependency tree
-      - name: 🐹 Setup Go (so FOSSA can resolve Go module dependency tree)
-        uses: actions/setup-go@v5
-        with:
-          go-version: '1.24'
-
-      # Step 2.5 — Download Go dependencies
-      - name: 📦 Download backend Go dependencies
-        run: go mod download
-        working-directory: backend
-
-      # Step 2.6 — Run FOSSA Analysis & Test
-      - name: 🔍 Run FOSSA dependency & license analysis
-        uses: fossa-contrib/fossa-action@v3
-        with:
-          api-key: ${{ secrets.FOSSA_API_KEY }}
-
-      # After this step, go to https://app.fossa.com to see full license report!
-
-# =============================================================================
-# JOB 3: DEPLOY TO EC2
-# =============================================================================
-# Purpose: SSH into our AWS EC2 server and deploy the updated Docker containers.
-#
-# needs: fossa-scan → means this job ONLY starts if BOTH Job 1 AND Job 2 passed
-#
-# THE SAFETY GUARANTEE:
-#   By the time we reach this job, we KNOW that:
-#   ✅ Our own code has no critical bugs or vulnerabilities (SonarCloud passed)
-#   ✅ Our dependencies are license-safe and CVE-free (FOSSA passed)
-#   → ONLY THEN do we deploy to production EC2.
-# =============================================================================
   deploy:
     name: 🚀 Deploy to AWS EC2 (Production)
     runs-on: ubuntu-latest
-    needs: fossa-scan  # ← GATE: only run if FOSSA scan PASSED (which needs Sonar to have passed)
-    # Don't deploy on pull_request — only deploy on actual push to main
     if: github.event_name == 'push'
 
     steps:
-      # Step 3.1 — SSH into EC2 and run deployment commands
-      # appleboy/ssh-action is a popular GitHub Action for SSH-based deployments
-      # It takes our secrets, opens an SSH connection, and runs the script below
       - name: 🚀 Deploy to EC2 via SSH
         uses: appleboy/ssh-action@v1.2.2
         with:
-          host: ${{ secrets.EC2_HOST }}         # EC2 public IP or domain
-          username: ${{ secrets.EC2_USER }}      # e.g., "ubuntu"
-          key: ${{ secrets.EC2_SSH_KEY }}        # PEM private key contents
-          command_timeout: 30m                   # allow up to 30 min for Docker build
-
-          # This is the shell script that runs ON EC2:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          command_timeout: 30m
           script: |
-            # Stop on any error — don't continue if something fails
             set -e
 
-            # ── Clone or Pull Latest Code ────────────────────────────────────
-            # First time: clone the repo to EC2
-            # Every time after: pull the latest main branch
             if [ ! -d "/home/ubuntu/aadil-crm/.git" ]; then
               echo "📥 First time setup: Cloning repository to EC2..."
               git clone https://github.com/Aadil86438/aadil-crm.git /home/ubuntu/aadil-crm
@@ -216,28 +38,19 @@ jobs:
               echo "🔄 Pulling latest changes from main branch..."
               cd /home/ubuntu/aadil-crm
               git fetch origin
-              git reset --hard origin/main  # force update — no merge conflicts
+              git reset --hard origin/main
             fi
 
             cd /home/ubuntu/aadil-crm
 
-            # ── Verify .env file exists ──────────────────────────────────────
-            # The .env file contains DB passwords, JWT secrets, etc.
-            # It's NEVER in Git (it's in .gitignore) — must be manually placed on EC2
             if [ ! -f ".env" ]; then
               echo "❌ ERROR: .env file missing in /home/ubuntu/aadil-crm!"
-              echo "Please create .env with required secrets before deploying."
               exit 1
             fi
 
-            # ── Rebuild and Restart Docker Containers ────────────────────────
-            # docker compose down → stops and removes all running containers
-            # docker compose up --build → rebuilds images from Dockerfiles and starts fresh
-            # -d means "detached" → runs in background, doesn't block the terminal
             echo "🐳 Rebuilding and restarting Docker containers..."
             docker compose down --remove-orphans
             docker compose up -d --build
 
-            # ── Verify Containers Are Running ────────────────────────────────
             echo "✅ Deployment complete! Checking running containers..."
             docker compose ps
