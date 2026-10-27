@@ -602,7 +602,7 @@
                   💥 SIMULATE CRASH / KILL POD
                 </v-btn>
               </v-card>
-            </col>
+            </v-col>
           </v-row>
 
           <!-- 💻 REAL-TIME KUBERNETES EVENT CONSOLE -->
@@ -1238,6 +1238,11 @@ export default {
           crm_code: u.crm_code || '',
         }))
       } catch (e) {
+        console.error('Failed to load member registrations:', e)
+        const errMsg = e.response?.data?.message || e.response?.data?.error || e.message || 'Failed to load registration records'
+        this.snackbarText = `Error loading members: ${errMsg}`
+        this.snackbarColor = 'error'
+        this.snackbar = true
         if (e.response?.status === 401) {
           this.authenticated = false
           this.adminToken = null

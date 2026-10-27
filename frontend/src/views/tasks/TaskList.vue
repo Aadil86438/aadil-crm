@@ -79,7 +79,7 @@
           <v-btn color="primary" @click="save" :loading="saving" id="task-save-btn">Save</v-btn>
         </v-card-actions>
       </v-card>
-    </dialog>
+    </v-dialog>
 
     <v-dialog v-model="deleteDialog" max-width="400">
       <v-card>

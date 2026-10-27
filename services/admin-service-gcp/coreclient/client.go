@@ -13,6 +13,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 	"time"
 )
 
@@ -44,34 +45,43 @@ func (c *CoreClient) ServiceKey() string {
 	return c.serviceKey
 }
 
-// doRequest makes an authenticated GET request to core-service-aws
+// doRequest makes an authenticated GET request to core-service-aws (with fallback between :8080 and :80)
 func (c *CoreClient) doRequest(path string) ([]byte, error) {
-	url := fmt.Sprintf("%s%s", c.baseURL, path)
-
-	req, err := http.NewRequest(http.MethodGet, url, nil)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create request: %w", err)
+	targetURLs := []string{fmt.Sprintf("%s%s", c.baseURL, path)}
+	if strings.Contains(c.baseURL, ":8080") {
+		targetURLs = append(targetURLs, fmt.Sprintf("%s%s", strings.Replace(c.baseURL, ":8080", "", 1), path))
 	}
 
-	// ← THIS IS HOW MICROSERVICES AUTHENTICATE WITH EACH OTHER
-	// We pass the shared secret in a custom header instead of a user JWT
-	req.Header.Set("X-Internal-Service-Key", c.serviceKey)
-	req.Header.Set("Content-Type", "application/json")
+	var lastErr error
+	for _, targetURL := range targetURLs {
+		req, err := http.NewRequest(http.MethodGet, targetURL, nil)
+		if err != nil {
+			lastErr = err
+			continue
+		}
 
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("request to core-service-aws failed: %w", err)
-	}
-	defer resp.Body.Close()
+		req.Header.Set("X-Internal-Service-Key", c.serviceKey)
+		req.Header.Set("Content-Type", "application/json")
 
-	if resp.StatusCode == http.StatusUnauthorized {
-		return nil, fmt.Errorf("inter-service auth failed: check INTERNAL_SERVICE_KEY in both services")
-	}
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("core-service-aws returned status %d", resp.StatusCode)
+		resp, err := c.httpClient.Do(req)
+		if err != nil {
+			lastErr = fmt.Errorf("request to %s failed: %w", targetURL, err)
+			continue
+		}
+		defer resp.Body.Close()
+
+		if resp.StatusCode == http.StatusUnauthorized {
+			return nil, fmt.Errorf("inter-service auth failed: check INTERNAL_SERVICE_KEY in both services")
+		}
+		if resp.StatusCode != http.StatusOK {
+			lastErr = fmt.Errorf("core-service-aws (%s) returned status %d", targetURL, resp.StatusCode)
+			continue
+		}
+
+		return io.ReadAll(resp.Body)
 	}
 
-	return io.ReadAll(resp.Body)
+	return nil, lastErr
 }
 
 // DoRequest performs an authenticated GET request and returns raw response bytes
@@ -79,34 +89,55 @@ func (c *CoreClient) DoRequest(path string) ([]byte, error) {
 	return c.doRequest(path)
 }
 
-// DoPostRequest performs an authenticated POST request to core-service-aws
+// DoPostRequest performs an authenticated POST request to core-service-aws (with fallback)
 func (c *CoreClient) DoPostRequest(path string, body io.Reader) ([]byte, error) {
-	url := fmt.Sprintf("%s%s", c.baseURL, path)
-
-	req, err := http.NewRequest(http.MethodPost, url, body)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create request: %w", err)
+	var bodyBytes []byte
+	if body != nil {
+		bodyBytes, _ = io.ReadAll(body)
 	}
 
-	req.Header.Set("X-Internal-Service-Key", c.serviceKey)
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("request to core-service-aws failed: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode == http.StatusUnauthorized {
-		return nil, fmt.Errorf("inter-service auth failed: check INTERNAL_SERVICE_KEY in both services")
+	targetURLs := []string{fmt.Sprintf("%s%s", c.baseURL, path)}
+	if strings.Contains(c.baseURL, ":8080") {
+		targetURLs = append(targetURLs, fmt.Sprintf("%s%s", strings.Replace(c.baseURL, ":8080", "", 1), path))
 	}
 
-	data, err := io.ReadAll(resp.Body)
-	if resp.StatusCode >= 400 {
-		return data, fmt.Errorf("core-service-aws returned status %d: %s", resp.StatusCode, string(data))
+	var lastErr error
+	for _, targetURL := range targetURLs {
+		var bodyReader io.Reader
+		if bodyBytes != nil {
+			bodyReader = strings.NewReader(string(bodyBytes))
+		}
+
+		req, err := http.NewRequest(http.MethodPost, targetURL, bodyReader)
+		if err != nil {
+			lastErr = err
+			continue
+		}
+
+		req.Header.Set("X-Internal-Service-Key", c.serviceKey)
+		req.Header.Set("Content-Type", "application/json")
+
+		resp, err := c.httpClient.Do(req)
+		if err != nil {
+			lastErr = fmt.Errorf("request to %s failed: %w", targetURL, err)
+			continue
+		}
+		defer resp.Body.Close()
+
+		if resp.StatusCode == http.StatusUnauthorized {
+			return nil, fmt.Errorf("inter-service auth failed: check INTERNAL_SERVICE_KEY in both services")
+		}
+
+		data, err := io.ReadAll(resp.Body)
+		if resp.StatusCode >= 400 {
+			lastErr = fmt.Errorf("core-service-aws (%s) returned status %d: %s", targetURL, resp.StatusCode, string(data))
+			continue
+		}
+
+		return data, err
 	}
 
-	return data, err
+	return nil, lastErr
 }
 
 // GetStats fetches dashboard stats from core-service-aws

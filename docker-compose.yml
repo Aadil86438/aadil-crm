@@ -53,6 +53,8 @@ services:
       RAZORPAY_KEY_ID: ${RAZORPAY_KEY_ID}
       RAZORPAY_KEY_SECRET: ${RAZORPAY_KEY_SECRET}
       INTERNAL_SERVICE_KEY: ${INTERNAL_SERVICE_KEY}
+    ports:
+      - "8080:8080"
     networks:
       - crm_net
 

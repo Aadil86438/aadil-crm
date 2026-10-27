@@ -4,7 +4,8 @@
   "description": "CRM Frontend - Vue 2 + Vuetify",
   "private": true,
   "scripts": {
-    "serve": "vue-cli-service serve --port 8081",
+    "dev": "vue-cli-service serve --port 3000",
+    "serve": "vue-cli-service serve --port 3000",
     "build": "vue-cli-service build",
     "lint": "vue-cli-service lint"
   },

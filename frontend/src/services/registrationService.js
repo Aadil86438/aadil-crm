@@ -33,10 +33,20 @@ export default {
   },
 
   // Legacy compatibility: getAll returns users proxied from core-service-aws
-  getAll(token) {
-    return axios.get(`${adminBaseURL}/api/admin/all`, {
-      headers: { Authorization: `Bearer ${token}` }
-    })
+  async getAll(token) {
+    try {
+      return await axios.get(`${adminBaseURL}/api/admin/all`, {
+        headers: { Authorization: `Bearer ${token}` }
+      })
+    } catch (err) {
+      // Fallback to core service directly if admin-service-gcp cross-cloud proxy fails
+      if (coreBaseURL && coreBaseURL !== adminBaseURL) {
+        return await axios.get(`${coreBaseURL}/api/users`, {
+          headers: { Authorization: `Bearer ${token}` }
+        })
+      }
+      throw err
+    }
   },
   getRedisData(token) {
     return axios.get(`${adminBaseURL}/api/admin/redis`, {
@@ -74,18 +84,36 @@ export default {
     return `${adminBaseURL}/api/admin/logs/download?date=${date}`
   },
 
-  // User Approval & Rejection (calls admin proxy or core service directly)
-  approveUser(id, token) {
-    const url = adminBaseURL ? `${adminBaseURL}/api/admin/users/${id}/approve` : `${coreBaseURL}/api/users/${id}/approve`
-    return axios.post(url, {}, {
-      headers: { Authorization: `Bearer ${token}` }
-    })
+  // User Approval & Rejection (calls admin proxy with fallback to core service)
+  async approveUser(id, token) {
+    try {
+      const url = adminBaseURL ? `${adminBaseURL}/api/admin/users/${id}/approve` : `${coreBaseURL}/api/users/${id}/approve`
+      return await axios.post(url, {}, {
+        headers: { Authorization: `Bearer ${token}` }
+      })
+    } catch (err) {
+      if (adminBaseURL && coreBaseURL && coreBaseURL !== adminBaseURL) {
+        return await axios.post(`${coreBaseURL}/api/users/${id}/approve`, {}, {
+          headers: { Authorization: `Bearer ${token}` }
+        })
+      }
+      throw err
+    }
   },
-  rejectUser(id, token) {
-    const url = adminBaseURL ? `${adminBaseURL}/api/admin/users/${id}/reject` : `${coreBaseURL}/api/users/${id}/reject`
-    return axios.post(url, {}, {
-      headers: { Authorization: `Bearer ${token}` }
-    })
+  async rejectUser(id, token) {
+    try {
+      const url = adminBaseURL ? `${adminBaseURL}/api/admin/users/${id}/reject` : `${coreBaseURL}/api/users/${id}/reject`
+      return await axios.post(url, {}, {
+        headers: { Authorization: `Bearer ${token}` }
+      })
+    } catch (err) {
+      if (adminBaseURL && coreBaseURL && coreBaseURL !== adminBaseURL) {
+        return await axios.post(`${coreBaseURL}/api/users/${id}/reject`, {}, {
+          headers: { Authorization: `Bearer ${token}` }
+        })
+      }
+      throw err
+    }
   },
 
   // Real-time live log stream SSE URL

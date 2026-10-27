@@ -1,0 +1,129 @@
+# ==============================================================================
+# LOCAL FULL-STACK DOCKER COMPOSE
+# ==============================================================================
+# Runs the entire application stack locally in isolated Docker containers:
+#   - Postgres DB          : Port 5432
+#   - Redis Cache          : Port 6379
+#   - Core Service (AWS)   : Port 8080
+#   - Admin Service (GCP)  : Port 8081
+#   - Frontend (Vue)       : Port 3000
+#
+# Usage:
+#   docker compose -f docker-compose.local.yml up --build
+# ==============================================================================
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: crm_local_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: employee_db
+      POSTGRES_USER: dev_user
+      POSTGRES_PASSWORD: dev_password_2026
+    ports:
+      - "5432:5432"
+    volumes:
+      - crm_local_pgdata:/var/lib/postgresql/data
+    networks:
+      - crm_local_net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U dev_user -d employee_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: crm_local_redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - crm_local_redisdata:/data
+    networks:
+      - crm_local_net
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  core-service-aws:
+    build:
+      context: ./services/core-service-aws
+      dockerfile: Dockerfile
+    container_name: crm_local_core
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      PORT: "8080"
+      APP_ENV: development
+      DB_HOST: postgres
+      DB_PORT: "5432"
+      DB_NAME: employee_db
+      DB_USER: dev_user
+      DB_PASSWORD: dev_password_2026
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
+      JWT_SECRET: local_dev_jwt_secret_key_2026
+      JWT_EXPIRATION: 24h
+      FRONTEND_URL: "http://localhost:3000,http://localhost"
+      INTERNAL_SERVICE_KEY: local_dev_internal_secret_2026
+      ENABLE_DAILY_HEALTH_REPORT: "false"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - crm_local_net
+
+  admin-service-gcp:
+    build:
+      context: ./services/admin-service-gcp
+      dockerfile: Dockerfile
+    container_name: crm_local_admin
+    restart: unless-stopped
+    ports:
+      - "8081:8081"
+    environment:
+      PORT: "8081"
+      APP_ENV: development
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
+      JWT_SECRET: local_dev_jwt_secret_key_2026
+      FRONTEND_URL: "http://localhost:3000,http://localhost"
+      CORE_SERVICE_URL: "http://core-service-aws:8080"
+      INTERNAL_SERVICE_KEY: local_dev_internal_secret_2026
+    depends_on:
+      - core-service-aws
+      - redis
+    networks:
+      - crm_local_net
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        VUE_APP_API_URL: /api
+        VUE_APP_ADMIN_API_URL: /api/admin
+    container_name: crm_local_frontend
+    restart: unless-stopped
+    ports:
+      - "3000:80"
+    depends_on:
+      - core-service-aws
+      - admin-service-gcp
+    networks:
+      - crm_local_net
+
+volumes:
+  crm_local_pgdata:
+  crm_local_redisdata:
+
+networks:
+  crm_local_net:
+    driver: bridge
