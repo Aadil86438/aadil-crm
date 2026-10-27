@@ -1,0 +1,57 @@
+# ==============================================================================
+# KUBERNETES MANIFEST 6: GCP ADMIN SERVICE
+# ==============================================================================
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: admin-service-deployment
+  labels:
+    app: crm-admin-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: crm-admin-service
+  template:
+    metadata:
+      labels:
+        app: crm-admin-service
+    spec:
+      containers:
+        - name: crm-admin-service
+          image: crm-admin-service-gcp:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8081
+          envFrom:
+            - configMapRef:
+                name: crm-config
+            - secretRef:
+                name: crm-secrets
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8081
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8081
+            initialDelaySeconds: 5
+            periodSeconds: 5
+
+---
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: admin-service
+spec:
+  selector:
+    app: crm-admin-service
+  ports:
+    - port: 8081
+      targetPort: 8081
+  type: ClusterIP

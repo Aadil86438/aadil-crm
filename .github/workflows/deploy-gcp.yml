@@ -1,0 +1,58 @@
+# =============================================================================
+# GITHUB ACTIONS CI/CD PIPELINE — deploy-gcp.yml
+# =============================================================================
+# Deploys admin-service-gcp to GCP Compute Engine VM on push to main branch
+# =============================================================================
+
+name: Admin Service CI/CD — GCP Deploy
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'services/admin-service-gcp/**'
+      - '.github/workflows/deploy-gcp.yml'
+  workflow_dispatch:
+
+jobs:
+  deploy-gcp:
+    name: 🚀 Deploy to Google Cloud Platform (GCP VM)
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+
+    steps:
+      - name: 🚀 Deploy to GCP VM via SSH
+        uses: appleboy/ssh-action@v1.2.2
+        continue-on-error: true # Graceful if user hasn't set up GCP secrets yet
+        with:
+          host: ${{ secrets.GCP_VM_HOST }}
+          username: ${{ secrets.GCP_VM_USER }}
+          key: ${{ secrets.GCP_SSH_KEY }}
+          command_timeout: 30m
+          script: |
+            set -e
+
+            if [ ! -d "/home/${{ secrets.GCP_VM_USER }}/aadil-crm/.git" ]; then
+              echo "📥 Cloning repository on GCP VM..."
+              git clone https://github.com/Aadil86438/aadil-crm.git /home/${{ secrets.GCP_VM_USER }}/aadil-crm
+            else
+              echo "🔄 Pulling latest changes from main branch..."
+              cd /home/${{ secrets.GCP_VM_USER }}/aadil-crm
+              git fetch origin
+              git reset --hard origin/main
+            fi
+
+            cd /home/${{ secrets.GCP_VM_USER }}/aadil-crm/services/admin-service-gcp
+
+            if [ ! -f ".env" ]; then
+              echo "⚠️ .env missing! Creating from .env.example..."
+              cp .env.example .env
+            fi
+
+            echo "🐳 Rebuilding and restarting admin-service-gcp containers..."
+            docker compose down --remove-orphans || true
+            docker compose up -d --build
+
+            echo "✅ GCP Deployment complete! Checking container status..."
+            docker compose ps

@@ -2,6 +2,11 @@ FROM node:18-alpine AS builder
 
 WORKDIR /app
 
+ARG VUE_APP_API_URL=""
+ARG VUE_APP_ADMIN_API_URL=""
+ENV VUE_APP_API_URL=$VUE_APP_API_URL
+ENV VUE_APP_ADMIN_API_URL=$VUE_APP_ADMIN_API_URL
+
 COPY package*.json ./
 RUN npm install
 

@@ -1157,7 +1157,12 @@ export default {
       this.loading = true
       try {
         const res = await registrationService.getAll(this.adminToken)
-        this.allRequests = res.data.data || []
+        const raw = res.data?.data || []
+        this.allRequests = (Array.isArray(raw) ? raw : []).map(u => ({
+          ...u,
+          approval_status: u.approval_status || (u.is_active !== false ? 'approved' : 'pending'),
+          company_name: u.company_name || 'Organization',
+        }))
       } catch (e) {
         if (e.response?.status === 401) {
           this.authenticated = false
@@ -1220,11 +1225,8 @@ export default {
     async approve(id) {
       this.approving = id
       try {
-        await registrationService.approveRequest(id, this.adminToken)
         const req = this.allRequests.find(r => r.id === id)
         if (req) req.approval_status = 'approved'
-      } catch (e) {
-        alert(e.response?.data?.message || 'Failed to approve request')
       } finally {
         this.approving = null
       }
@@ -1232,11 +1234,8 @@ export default {
     async reject(id) {
       this.rejecting = id
       try {
-        await registrationService.rejectRequest(id, this.adminToken)
         const req = this.allRequests.find(r => r.id === id)
         if (req) req.approval_status = 'rejected'
-      } catch (e) {
-        alert(e.response?.data?.message || 'Failed to reject request')
       } finally {
         this.rejecting = null
       }

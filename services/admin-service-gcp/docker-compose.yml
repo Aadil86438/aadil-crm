@@ -1,0 +1,45 @@
+# ==============================================================================
+# GCP ADMIN MICROSERVICE — STANDALONE DOCKER COMPOSE
+# ==============================================================================
+# Run this on your GCP VM (e2-micro) to host the Admin Service on port 8081.
+# ==============================================================================
+
+services:
+  redis:
+    image: redis:7-alpine
+    container_name: gcp_admin_redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - gcp_redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  admin-service-gcp:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: gcp_admin_service
+    restart: unless-stopped
+    ports:
+      - "8081:8081"
+    environment:
+      PORT: ${PORT:-8081}
+      APP_ENV: ${APP_ENV:-production}
+      REDIS_HOST: ${REDIS_HOST:-redis}
+      REDIS_PORT: ${REDIS_PORT:-6379}
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-}
+      JWT_SECRET: ${JWT_SECRET:-change_this_to_matched_jwt_secret}
+      FRONTEND_URL: ${FRONTEND_URL:-*}
+      CORE_SERVICE_URL: ${CORE_SERVICE_URL:-http://localhost:8080}
+      INTERNAL_SERVICE_KEY: ${INTERNAL_SERVICE_KEY:-crm_internal_secret_key_2026}
+    depends_on:
+      redis:
+        condition: service_healthy
+
+volumes:
+  gcp_redis_data:

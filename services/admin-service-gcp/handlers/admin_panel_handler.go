@@ -6,18 +6,15 @@ import (
 
 	"admin-service-gcp/database"
 	"admin-service-gcp/models"
-	"admin-service-gcp/repositories"
 	"admin-service-gcp/utils"
 )
 
 // AdminPanelHandler handles the admin approval & devops panel
-type AdminPanelHandler struct {
-	userRepo *repositories.UserRepository
-}
+type AdminPanelHandler struct{}
 
 // NewAdminPanelHandler creates a new AdminPanelHandler
-func NewAdminPanelHandler(userRepo *repositories.UserRepository) *AdminPanelHandler {
-	return &AdminPanelHandler{userRepo: userRepo}
+func NewAdminPanelHandler() *AdminPanelHandler {
+	return &AdminPanelHandler{}
 }
 
 // adminCode is the hardcoded admin access code
@@ -47,19 +44,6 @@ func (h *AdminPanelHandler) VerifyCode(w http.ResponseWriter, r *http.Request) {
 		"token":   token,
 		"message": "Admin access granted",
 	})
-}
-
-// ListUsers handles GET /api/admin/all — lists registered system users
-func (h *AdminPanelHandler) ListAll(w http.ResponseWriter, r *http.Request) {
-	users, _, err := h.userRepo.ListUsers(1, 1000)
-	if err != nil {
-		utils.InternalServerError(w, "Failed to fetch users")
-		return
-	}
-	if users == nil {
-		users = []*models.User{}
-	}
-	utils.Success(w, users)
 }
 
 // RedisKeyItem represents a key-value detail in Redis

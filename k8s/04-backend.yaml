@@ -23,7 +23,7 @@ spec:
     spec:
       containers:
         - name: crm-backend   # Container name inside the pod
-          image: crm-backend:latest # Local Docker image built from /backend
+          image: crm-core-service-aws:latest # Docker image built from /services/core-service-aws
           imagePullPolicy: IfNotPresent # Use local image if available
           ports:
             - containerPort: 8080 # Go application HTTP listening port

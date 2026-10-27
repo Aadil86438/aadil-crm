@@ -64,6 +64,11 @@ func (c *CoreClient) doRequest(path string) ([]byte, error) {
 	return io.ReadAll(resp.Body)
 }
 
+// DoRequest performs an authenticated GET request and returns raw response bytes
+func (c *CoreClient) DoRequest(path string) ([]byte, error) {
+	return c.doRequest(path)
+}
+
 // GetStats fetches dashboard stats from core-service-aws
 func (c *CoreClient) GetStats() (map[string]interface{}, error) {
 	body, err := c.doRequest("/internal/stats")

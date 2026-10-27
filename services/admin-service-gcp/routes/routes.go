@@ -21,7 +21,7 @@ func Setup(cfg *config.Config) http.Handler {
 	core := coreclient.New(cfg.CoreServiceURL, cfg.InternalServiceKey)
 
 	// ── Local Admin Handlers (DevOps tools that run locally on GCP) ──────────
-	adminPanelH := handlers.NewAdminPanelHandler(nil) // no DB — pure admin ops
+	adminPanelH := handlers.NewAdminPanelHandler() // pure admin ops
 	k8sH := handlers.NewK8sHandler()
 	logViewerH := handlers.NewLogViewerHandler()
 
@@ -52,6 +52,15 @@ func Setup(cfg *config.Config) http.Handler {
 
 	// ─── PROTECTED ADMIN ROUTES ───────────────────────────────────────────────
 	adminAuth := middleware.Auth
+
+	// Legacy compatibility: /api/admin/all proxies users from core-service-aws
+	mux.Handle("/api/admin/all", adminAuth(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet {
+			coreUsersH.List(w, r)
+		} else {
+			http.NotFound(w, r)
+		}
+	})))
 
 	// Redis Inspector (local GCP Redis or shared AWS Redis)
 	mux.Handle("/api/admin/redis", adminAuth(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
