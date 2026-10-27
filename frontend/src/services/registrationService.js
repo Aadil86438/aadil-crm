@@ -72,5 +72,27 @@ export default {
   },
   getLogDownloadURL(date, token) {
     return `${adminBaseURL}/api/admin/logs/download?date=${date}`
+  },
+
+  // User Approval & Rejection (calls admin proxy or core service directly)
+  approveUser(id, token) {
+    const url = adminBaseURL ? `${adminBaseURL}/api/admin/users/${id}/approve` : `${coreBaseURL}/api/users/${id}/approve`
+    return axios.post(url, {}, {
+      headers: { Authorization: `Bearer ${token}` }
+    })
+  },
+  rejectUser(id, token) {
+    const url = adminBaseURL ? `${adminBaseURL}/api/admin/users/${id}/reject` : `${coreBaseURL}/api/users/${id}/reject`
+    return axios.post(url, {}, {
+      headers: { Authorization: `Bearer ${token}` }
+    })
+  },
+
+  // Real-time live log stream SSE URL
+  getLiveLogsStreamURL(token) {
+    if (adminBaseURL) {
+      return `${adminBaseURL}/api/admin/logs/live?token=${encodeURIComponent(token || '')}`
+    }
+    return `${coreBaseURL}/api/logs/live`
   }
 }

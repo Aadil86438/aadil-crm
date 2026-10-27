@@ -35,7 +35,22 @@
                   :rules="passwordRules"
                   required outlined dense color="primary"
                   background-color="white"
-                  class="mb-4" id="login-password"
+                  class="mb-3" id="login-password"
+                />
+
+                <v-text-field
+                  v-model="crmCode"
+                  label="CRM Access Code *"
+                  placeholder="e.g. CRMU01"
+                  prepend-inner-icon="mdi-shield-key-outline"
+                  :rules="crmCodeRules"
+                  required outlined dense color="primary"
+                  background-color="white"
+                  class="mb-4"
+                  id="login-crm-code"
+                  @input="crmCode = (crmCode || '').toUpperCase()"
+                  hint="Enter the code sent to your email after admin approval"
+                  persistent-hint
                 />
 
                 <v-alert v-if="error" type="error" dense text class="mb-4">
@@ -76,6 +91,7 @@ export default {
       valid: false,
       email: '',
       password: '',
+      crmCode: '',
       showPassword: false,
       loading: false,
       error: null,
@@ -85,6 +101,10 @@ export default {
       ],
       passwordRules: [
         v => !!v || 'Password is required'
+      ],
+      crmCodeRules: [
+        v => !!v || 'CRM Access Code is required',
+        v => (v && v.trim().length >= 4) || 'Code must be at least 4 characters (e.g. CRMU01)'
       ]
     }
   },
@@ -95,10 +115,14 @@ export default {
       this.loading = true
       this.error = null
       try {
-        await this.login({ email: this.email, password: this.password })
+        await this.login({
+          email: this.email.trim(),
+          password: this.password,
+          crm_code: (this.crmCode || '').trim().toUpperCase()
+        })
         this.$router.push('/dashboard')
       } catch (err) {
-        this.error = err.response?.data?.message || 'Invalid email or password'
+        this.error = err.response?.data?.message || 'Invalid email, password, or CRM access code'
       } finally {
         this.loading = false
       }

@@ -28,13 +28,22 @@ func Setup(cfg *config.Config) http.Handler {
 	activityH := handlers.NewActivityHandler(activityRepo, auditRepo)
 	noteH := handlers.NewNoteHandler(noteRepo, auditRepo)
 	dashboardH := handlers.NewDashboardHandler(taskRepo, activityRepo)
-	userH := handlers.NewUserHandler(userRepo, auditRepo)
+	userH := handlers.NewUserHandler(userRepo, auditRepo, cfg)
 	auditH := handlers.NewAuditHandler(auditRepo)
 
 	mux := http.NewServeMux()
 
 	// ─── HEALTH CHECK (public) ─────────────────────────────────────
 	mux.HandleFunc("/health", handlers.Health)
+
+	// ─── LIVE LOGS SSE STREAM (public/internal) ────────────────────
+	mux.HandleFunc("/api/logs/live", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet {
+			middleware.LiveLogsStreamHandler(w, r)
+		} else {
+			http.NotFound(w, r)
+		}
+	})
 
 	// ─── INTERNAL API (called by admin-service-gcp) ───────────────
 	// Protected by X-Internal-Service-Key header (service-to-service auth)
@@ -55,6 +64,33 @@ func Setup(cfg *config.Config) http.Handler {
 	mux.Handle("/internal/users", middleware.InternalServiceAuth(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodGet {
 			userH.List(w, r)
+		} else {
+			http.NotFound(w, r)
+		}
+	})))
+	mux.Handle("/internal/users/", middleware.InternalServiceAuth(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		path := r.URL.Path
+		if hasPathSuffix(path, "/approve") {
+			if r.Method == http.MethodPost {
+				userH.Approve(w, r)
+			} else {
+				http.NotFound(w, r)
+			}
+			return
+		}
+		if hasPathSuffix(path, "/reject") {
+			if r.Method == http.MethodPost {
+				userH.Reject(w, r)
+			} else {
+				http.NotFound(w, r)
+			}
+			return
+		}
+		http.NotFound(w, r)
+	})))
+	mux.Handle("/internal/logs/live", middleware.InternalServiceAuth(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet {
+			middleware.LiveLogsStreamHandler(w, r)
 		} else {
 			http.NotFound(w, r)
 		}
@@ -170,6 +206,18 @@ func Setup(cfg *config.Config) http.Handler {
 		if hasPathSuffix(path, "/password") {
 			if r.Method == http.MethodPut {
 				userH.ResetPassword(w, r)
+			}
+			return
+		}
+		if hasPathSuffix(path, "/approve") {
+			if r.Method == http.MethodPost {
+				userH.Approve(w, r)
+			}
+			return
+		}
+		if hasPathSuffix(path, "/reject") {
+			if r.Method == http.MethodPost {
+				userH.Reject(w, r)
 			}
 			return
 		}

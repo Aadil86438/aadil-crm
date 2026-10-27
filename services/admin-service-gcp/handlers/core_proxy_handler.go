@@ -3,6 +3,7 @@ package handlers
 import (
 	"fmt"
 	"net/http"
+	"strings"
 
 	"admin-service-gcp/coreclient"
 	"admin-service-gcp/utils"
@@ -89,4 +90,53 @@ func (h *CoreUsersHandler) List(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	w.Write(data)
+}
+
+// Approve forwards POST /api/admin/users/:id/approve to core-service-aws
+func (h *CoreUsersHandler) Approve(w http.ResponseWriter, r *http.Request) {
+	id := extractActionID(r.URL.Path, "approve")
+	if id == "" {
+		utils.BadRequest(w, "Invalid user ID")
+		return
+	}
+
+	path := fmt.Sprintf("/internal/users/%s/approve", id)
+	data, err := h.core.DoPostRequest(path, r.Body)
+	if err != nil {
+		utils.InternalServerError(w, "Could not reach core-service-aws: "+err.Error())
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	w.Write(data)
+}
+
+// Reject forwards POST /api/admin/users/:id/reject to core-service-aws
+func (h *CoreUsersHandler) Reject(w http.ResponseWriter, r *http.Request) {
+	id := extractActionID(r.URL.Path, "reject")
+	if id == "" {
+		utils.BadRequest(w, "Invalid user ID")
+		return
+	}
+
+	path := fmt.Sprintf("/internal/users/%s/reject", id)
+	data, err := h.core.DoPostRequest(path, r.Body)
+	if err != nil {
+		utils.InternalServerError(w, "Could not reach core-service-aws: "+err.Error())
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	w.Write(data)
+}
+
+func extractActionID(path, action string) string {
+	trimmed := strings.Trim(path, "/")
+	parts := strings.Split(trimmed, "/")
+	for i := len(parts) - 1; i >= 0; i-- {
+		if parts[i] == action && i > 0 {
+			return parts[i-1]
+		}
+	}
+	return ""
 }

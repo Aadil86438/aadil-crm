@@ -26,6 +26,13 @@
           <v-chip x-small :color="roleColor(item.role)" dark class="text-capitalize">{{ item.role }}</v-chip>
         </template>
 
+        <template v-slot:item.crm_code="{ item }">
+          <v-chip v-if="item.crm_code" x-small color="deep-purple lighten-5" class="deep-purple--text text--darken-2 font-weight-bold" label>
+            {{ item.crm_code }}
+          </v-chip>
+          <span v-else class="caption grey--text">—</span>
+        </template>
+
         <template v-slot:item.status="{ item }">
           <v-chip x-small :color="item.status === 'active' ? 'success' : 'grey'" dark>{{ item.status }}</v-chip>
         </template>
@@ -100,6 +107,7 @@ export default {
       headers: [
         { text: 'Name', value: 'name' },
         { text: 'Email', value: 'email' },
+        { text: 'CRM Code', value: 'crm_code' },
         { text: 'Role', value: 'role' },
         { text: 'Status', value: 'status' },
         { text: 'Actions', value: 'actions', sortable: false, align: 'center' }

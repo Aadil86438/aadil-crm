@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"bufio"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -10,22 +11,25 @@ import (
 	"sort"
 	"strings"
 	"time"
+
+	"admin-service-gcp/coreclient"
 )
 
 // LogViewerHandler handles log file browsing, viewing, and downloading
 type LogViewerHandler struct {
 	logDir string
+	core   *coreclient.CoreClient
 }
 
 // NewLogViewerHandler creates a new log viewer handler
-func NewLogViewerHandler() *LogViewerHandler {
+func NewLogViewerHandler(core *coreclient.CoreClient) *LogViewerHandler {
 	logDir := os.Getenv("LOG_DIR")
 	if logDir == "" {
 		logDir = "./logs"
 	}
 	// Ensure the logs directory exists
 	os.MkdirAll(logDir, 0755)
-	return &LogViewerHandler{logDir: logDir}
+	return &LogViewerHandler{logDir: logDir, core: core}
 }
 
 // LogFileInfo represents metadata about a single log file
@@ -342,5 +346,61 @@ func writeJSON(w http.ResponseWriter, status int, data interface{}) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 	json.NewEncoder(w).Encode(data)
+}
+
+// LiveLogs streams real-time logs from core-service-aws and local GCP server via SSE
+func (h *LogViewerHandler) LiveLogs(w http.ResponseWriter, r *http.Request) {
+	flusher, ok := w.(http.Flusher)
+	if !ok {
+		http.Error(w, "Streaming unsupported", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "text/event-stream")
+	w.Header().Set("Cache-Control", "no-cache")
+	w.Header().Set("Connection", "keep-alive")
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+
+	// Send handshake event
+	fmt.Fprintf(w, "event: connected\ndata: {\"status\":\"connected\",\"service\":\"admin-service-gcp\"}\n\n")
+	flusher.Flush()
+
+	ctx := r.Context()
+
+	// If we have coreclient configured, proxy live stream from core-service-aws
+	if h.core != nil {
+		coreStreamURL := fmt.Sprintf("%s/internal/logs/live", h.core.BaseURL())
+		coreReq, err := http.NewRequestWithContext(ctx, http.MethodGet, coreStreamURL, nil)
+		if err == nil {
+			coreReq.Header.Set("X-Internal-Service-Key", h.core.ServiceKey())
+			resp, err := http.DefaultClient.Do(coreReq)
+			if err == nil && resp.StatusCode == http.StatusOK {
+				defer resp.Body.Close()
+				reader := bufio.NewReader(resp.Body)
+				for {
+					line, err := reader.ReadString('\n')
+					if err != nil {
+						break
+					}
+					fmt.Fprintf(w, "%s", line)
+					flusher.Flush()
+				}
+				return
+			}
+		}
+	}
+
+	// Fallback keepalive loop if core stream is disconnected
+	ticker := time.NewTicker(15 * time.Second)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			fmt.Fprintf(w, ": keepalive\n\n")
+			flusher.Flush()
+		}
+	}
 }
 

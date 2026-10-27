@@ -3,6 +3,8 @@ package repositories
 import (
 	"database/sql"
 	"fmt"
+	"strconv"
+	"strings"
 	"time"
 
 	"core-service-aws/models"
@@ -22,9 +24,12 @@ func NewUserRepository(db *sql.DB) *UserRepository {
 func (r *UserRepository) FindByEmail(email string) (*models.User, error) {
 	u := &models.User{}
 	err := r.db.QueryRow(`
-		SELECT id, name, email, password_hash, role, status, created_at, updated_at
+		SELECT id, name, email, password_hash, role, status,
+		       COALESCE(crm_code, ''), COALESCE(approval_status, 'pending'), COALESCE(company_name, ''),
+		       created_at, updated_at
 		FROM users WHERE email = $1 AND deleted_at IS NULL
-	`, email).Scan(&u.ID, &u.Name, &u.Email, &u.PasswordHash, &u.Role, &u.Status, &u.CreatedAt, &u.UpdatedAt)
+	`, email).Scan(&u.ID, &u.Name, &u.Email, &u.PasswordHash, &u.Role, &u.Status,
+		&u.CRMCode, &u.ApprovalStatus, &u.CompanyName, &u.CreatedAt, &u.UpdatedAt)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -35,9 +40,12 @@ func (r *UserRepository) FindByEmail(email string) (*models.User, error) {
 func (r *UserRepository) FindByID(id string) (*models.User, error) {
 	u := &models.User{}
 	err := r.db.QueryRow(`
-		SELECT id, name, email, password_hash, role, status, created_at, updated_at
+		SELECT id, name, email, password_hash, role, status,
+		       COALESCE(crm_code, ''), COALESCE(approval_status, 'pending'), COALESCE(company_name, ''),
+		       created_at, updated_at
 		FROM users WHERE id = $1 AND deleted_at IS NULL
-	`, id).Scan(&u.ID, &u.Name, &u.Email, &u.PasswordHash, &u.Role, &u.Status, &u.CreatedAt, &u.UpdatedAt)
+	`, id).Scan(&u.ID, &u.Name, &u.Email, &u.PasswordHash, &u.Role, &u.Status,
+		&u.CRMCode, &u.ApprovalStatus, &u.CompanyName, &u.CreatedAt, &u.UpdatedAt)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -48,7 +56,9 @@ func (r *UserRepository) FindByID(id string) (*models.User, error) {
 func (r *UserRepository) ListUsers(page, pageSize int) ([]*models.User, int, error) {
 	offset := (page - 1) * pageSize
 	rows, err := r.db.Query(`
-		SELECT id, name, email, role, status, created_at, updated_at
+		SELECT id, name, email, role, status,
+		       COALESCE(crm_code, ''), COALESCE(approval_status, 'pending'), COALESCE(company_name, ''),
+		       created_at, updated_at
 		FROM users WHERE deleted_at IS NULL
 		ORDER BY created_at DESC
 		LIMIT $1 OFFSET $2
@@ -61,7 +71,8 @@ func (r *UserRepository) ListUsers(page, pageSize int) ([]*models.User, int, err
 	var users []*models.User
 	for rows.Next() {
 		u := &models.User{}
-		if err := rows.Scan(&u.ID, &u.Name, &u.Email, &u.Role, &u.Status, &u.CreatedAt, &u.UpdatedAt); err != nil {
+		if err := rows.Scan(&u.ID, &u.Name, &u.Email, &u.Role, &u.Status,
+			&u.CRMCode, &u.ApprovalStatus, &u.CompanyName, &u.CreatedAt, &u.UpdatedAt); err != nil {
 			return nil, 0, err
 		}
 		users = append(users, u)
@@ -72,15 +83,80 @@ func (r *UserRepository) ListUsers(page, pageSize int) ([]*models.User, int, err
 	return users, total, nil
 }
 
-// Create creates a new user
-func (r *UserRepository) Create(req *models.CreateUserRequest, passwordHash string) (*models.User, error) {
+// GetNextCRMCode calculates the next sequential CRM user code (e.g. CRMU01, CRMU02, CRMU03)
+func (r *UserRepository) GetNextCRMCode() (string, error) {
+	rows, err := r.db.Query(`SELECT crm_code FROM users WHERE crm_code IS NOT NULL AND crm_code != ''`)
+	if err != nil {
+		return "CRMU01", err
+	}
+	defer rows.Close()
+
+	maxNum := 0
+	for rows.Next() {
+		var code string
+		if err := rows.Scan(&code); err == nil {
+			trimmed := strings.ToUpper(strings.TrimSpace(code))
+			if strings.HasPrefix(trimmed, "CRMU") {
+				numPart := strings.TrimPrefix(trimmed, "CRMU")
+				if n, err := strconv.Atoi(numPart); err == nil {
+					if n > maxNum {
+						maxNum = n
+					}
+				}
+			}
+		}
+	}
+
+	nextNum := maxNum + 1
+	return fmt.Sprintf("CRMU%02d", nextNum), nil
+}
+
+// ApproveUser updates a user to active & approved, assigning the generated CRM code
+func (r *UserRepository) ApproveUser(id, crmCode string) (*models.User, error) {
 	u := &models.User{}
 	err := r.db.QueryRow(`
-		INSERT INTO users (name, email, password_hash, role, status)
-		VALUES ($1, $2, $3, $4, 'active')
-		RETURNING id, name, email, role, status, created_at, updated_at
-	`, req.Name, req.Email, passwordHash, req.Role).Scan(
-		&u.ID, &u.Name, &u.Email, &u.Role, &u.Status, &u.CreatedAt, &u.UpdatedAt,
+		UPDATE users 
+		SET approval_status = 'approved', status = 'active', crm_code = $1, updated_at = NOW()
+		WHERE id = $2 AND deleted_at IS NULL
+		RETURNING id, name, email, role, status, COALESCE(crm_code, ''), COALESCE(approval_status, 'pending'), COALESCE(company_name, ''), created_at, updated_at
+	`, crmCode, id).Scan(
+		&u.ID, &u.Name, &u.Email, &u.Role, &u.Status, &u.CRMCode, &u.ApprovalStatus, &u.CompanyName, &u.CreatedAt, &u.UpdatedAt,
+	)
+	return u, err
+}
+
+// RejectUser updates a user to inactive & rejected
+func (r *UserRepository) RejectUser(id string) (*models.User, error) {
+	u := &models.User{}
+	err := r.db.QueryRow(`
+		UPDATE users 
+		SET approval_status = 'rejected', status = 'inactive', updated_at = NOW()
+		WHERE id = $1 AND deleted_at IS NULL
+		RETURNING id, name, email, role, status, COALESCE(crm_code, ''), COALESCE(approval_status, 'pending'), COALESCE(company_name, ''), created_at, updated_at
+	`, id).Scan(
+		&u.ID, &u.Name, &u.Email, &u.Role, &u.Status, &u.CRMCode, &u.ApprovalStatus, &u.CompanyName, &u.CreatedAt, &u.UpdatedAt,
+	)
+	return u, err
+}
+
+// Create creates a new user
+func (r *UserRepository) Create(req *models.CreateUserRequest, passwordHash string) (*models.User, error) {
+	status := "active"
+	approvalStatus := req.ApprovalStatus
+	if approvalStatus == "" {
+		approvalStatus = "pending"
+	}
+	if approvalStatus == "pending" {
+		status = "inactive"
+	}
+
+	u := &models.User{}
+	err := r.db.QueryRow(`
+		INSERT INTO users (name, email, password_hash, role, status, approval_status, crm_code, company_name)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+		RETURNING id, name, email, role, status, COALESCE(crm_code, ''), COALESCE(approval_status, 'pending'), COALESCE(company_name, ''), created_at, updated_at
+	`, req.Name, req.Email, passwordHash, req.Role, status, approvalStatus, req.CRMCode, req.CompanyName).Scan(
+		&u.ID, &u.Name, &u.Email, &u.Role, &u.Status, &u.CRMCode, &u.ApprovalStatus, &u.CompanyName, &u.CreatedAt, &u.UpdatedAt,
 	)
 	return u, err
 }
@@ -89,11 +165,15 @@ func (r *UserRepository) Create(req *models.CreateUserRequest, passwordHash stri
 func (r *UserRepository) Update(id string, req *models.UpdateUserRequest) (*models.User, error) {
 	u := &models.User{}
 	err := r.db.QueryRow(`
-		UPDATE users SET name=$1, email=$2, role=$3, status=$4, updated_at=NOW()
-		WHERE id=$5 AND deleted_at IS NULL
-		RETURNING id, name, email, role, status, created_at, updated_at
-	`, req.Name, req.Email, req.Role, req.Status, id).Scan(
-		&u.ID, &u.Name, &u.Email, &u.Role, &u.Status, &u.CreatedAt, &u.UpdatedAt,
+		UPDATE users 
+		SET name=$1, email=$2, role=$3, status=$4, 
+		    approval_status=COALESCE(NULLIF($5, ''), approval_status),
+		    crm_code=COALESCE(NULLIF($6, ''), crm_code),
+		    updated_at=NOW()
+		WHERE id=$7 AND deleted_at IS NULL
+		RETURNING id, name, email, role, status, COALESCE(crm_code, ''), COALESCE(approval_status, 'pending'), COALESCE(company_name, ''), created_at, updated_at
+	`, req.Name, req.Email, req.Role, req.Status, req.ApprovalStatus, req.CRMCode, id).Scan(
+		&u.ID, &u.Name, &u.Email, &u.Role, &u.Status, &u.CRMCode, &u.ApprovalStatus, &u.CompanyName, &u.CreatedAt, &u.UpdatedAt,
 	)
 	return u, err
 }

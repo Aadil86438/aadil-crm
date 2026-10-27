@@ -32,12 +32,39 @@
               <span class="text-h5 font-weight-black primary--text">Proprietor</span>
             </div>
 
-            <div class="mb-6">
-              <h2 class="text-h5 font-weight-bold grey--text text--darken-3">Create Account</h2>
-              <p class="text-body-2 grey--text mt-1 mb-0">Get started with your CRM in seconds</p>
+            <!-- Success State: Awaiting Approval -->
+            <div v-if="submittedSuccess" class="text-center py-4">
+              <v-avatar color="amber lighten-5" size="80" class="mb-4 elevation-1">
+                <v-icon color="warning" size="44">mdi-clock-check-outline</v-icon>
+              </v-avatar>
+              <h2 class="text-h5 font-weight-bold text--primary mb-2">Request Submitted!</h2>
+              <p class="text-body-2 grey--text text--darken-2 mb-4">
+                Your account request for <strong>{{ form.name }}</strong> ({{ form.company_name }}) has been submitted for admin approval.
+              </p>
+              <v-alert type="info" outlined dense class="text-left mb-6 rounded-lg" style="background: white;">
+                <div class="font-weight-bold caption mb-1">What happens next?</div>
+                <ol class="pl-4 caption grey--text text--darken-3">
+                  <li>System administrator will review and approve your request.</li>
+                  <li>A unique <strong>CRM Access Code (CRMU01, CRMU02, ...)</strong> will be sent to <strong>{{ form.email }}</strong>.</li>
+                  <li>You will use your email, password, and that code to sign in.</li>
+                </ol>
+              </v-alert>
+              <v-btn color="primary" block large @click="$router.push('/login')" class="rounded-lg font-weight-bold mb-3">
+                <v-icon left>mdi-login</v-icon> Proceed to Sign In
+              </v-btn>
+              <v-btn text small color="grey" @click="submittedSuccess = false">
+                Register another account
+              </v-btn>
             </div>
 
-            <v-form ref="form" @submit.prevent="handleRegister" v-model="valid">
+            <!-- Registration Form -->
+            <div v-else>
+              <div class="mb-6">
+                <h2 class="text-h5 font-weight-bold grey--text text--darken-3">Create Account</h2>
+                <p class="text-body-2 grey--text mt-1 mb-0">Get started with your CRM in seconds</p>
+              </div>
+
+              <v-form ref="form" @submit.prevent="handleRegister" v-model="valid">
               <v-text-field
                 v-model="form.name"
                 label="Full Name"
@@ -105,13 +132,14 @@
               </p>
             </div>
 
-            <!-- Admin Access -->
-            <v-divider class="my-4" />
-            <div class="text-center">
-              <v-btn text small color="grey" @click="$router.push('/admin-panel')" id="admin-access-btn">
-                <v-icon left small>mdi-shield-lock</v-icon>
-                Admin Access
-              </v-btn>
+              <!-- Admin Access -->
+              <v-divider class="my-4" />
+              <div class="text-center">
+                <v-btn text small color="grey" @click="$router.push('/admin-panel')" id="admin-access-btn">
+                  <v-icon left small>mdi-shield-lock</v-icon>
+                  Admin Access
+                </v-btn>
+              </div>
             </div>
           </div>
         </v-col>
@@ -128,6 +156,7 @@ export default {
   data() {
     return {
       valid: false,
+      submittedSuccess: false,
       form: { name: '', email: '', password: '', company_name: '' },
       confirmPassword: '',
       showPass: false,
@@ -163,11 +192,8 @@ export default {
       this.loading = true
       this.error = null
       try {
-        const res = await registrationService.register(this.form)
-        const authData = res.data.data
-        // Store auth state and redirect directly to dashboard
-        this.$store.commit('auth/SET_AUTH', authData)
-        this.$router.push('/dashboard')
+        await registrationService.register(this.form)
+        this.submittedSuccess = true
       } catch (err) {
         this.error = err.response?.data?.message || 'Registration failed. Please try again.'
       } finally {

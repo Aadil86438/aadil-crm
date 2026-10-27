@@ -2,12 +2,15 @@ package handlers
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strings"
 
+	"core-service-aws/config"
 	"core-service-aws/middleware"
 	"core-service-aws/models"
 	"core-service-aws/repositories"
+	"core-service-aws/services"
 	"core-service-aws/utils"
 )
 
@@ -15,16 +18,19 @@ import (
 type UserHandler struct {
 	userRepo  *repositories.UserRepository
 	auditRepo *repositories.AuditRepository
+	cfg       *config.Config
 }
 
 // NewUserHandler creates a new UserHandler
 func NewUserHandler(
 	userRepo *repositories.UserRepository,
 	auditRepo *repositories.AuditRepository,
+	cfg *config.Config,
 ) *UserHandler {
 	return &UserHandler{
 		userRepo:  userRepo,
 		auditRepo: auditRepo,
+		cfg:       cfg,
 	}
 }
 
@@ -203,6 +209,116 @@ func (h *UserHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	}
 
 	utils.Success(w, map[string]string{"message": "User deleted successfully"})
+}
+
+// Approve handles approving a user registration, generating next CRM code and emailing it
+func (h *UserHandler) Approve(w http.ResponseWriter, r *http.Request) {
+	id := extractActionID(r.URL.Path, "approve")
+	if id == "" {
+		utils.BadRequest(w, "Invalid user ID")
+		return
+	}
+
+	user, err := h.userRepo.FindByID(id)
+	if err != nil || user == nil {
+		utils.NotFound(w, "User not found")
+		return
+	}
+
+	// Determine CRM code (if user already had a code, keep it, otherwise generate next)
+	crmCode := user.CRMCode
+	if crmCode == "" {
+		crmCode, err = h.userRepo.GetNextCRMCode()
+		if err != nil {
+			utils.InternalServerError(w, "Failed to generate CRM code: "+err.Error())
+			return
+		}
+	}
+
+	approvedUser, err := h.userRepo.ApproveUser(id, crmCode)
+	if err != nil {
+		utils.InternalServerError(w, "Failed to approve user: "+err.Error())
+		return
+	}
+
+	// Dispatch approval email
+	go func() {
+		if h.cfg != nil {
+			_ = services.SendApprovalEmail(h.cfg, approvedUser.Email, approvedUser.Name, crmCode)
+		}
+	}()
+
+	claims := middleware.GetClaims(r)
+	userEmail := "admin"
+	var userID *string
+	if claims != nil {
+		userEmail = claims.Email
+		userID = &claims.UserID
+	}
+	h.auditRepo.Create(&models.CreateAuditLogRequest{
+		UserID:    userID,
+		UserEmail: userEmail,
+		Action:    "approve_user",
+		Entity:    "user",
+		EntityID:  &id,
+		IPAddress: r.RemoteAddr,
+	})
+
+	utils.Success(w, map[string]interface{}{
+		"success":  true,
+		"message":  fmt.Sprintf("User %s approved successfully! CRM Code: %s", approvedUser.Name, crmCode),
+		"crm_code": crmCode,
+		"user":     approvedUser,
+	})
+}
+
+// Reject handles rejecting a user registration
+func (h *UserHandler) Reject(w http.ResponseWriter, r *http.Request) {
+	id := extractActionID(r.URL.Path, "reject")
+	if id == "" {
+		utils.BadRequest(w, "Invalid user ID")
+		return
+	}
+
+	rejectedUser, err := h.userRepo.RejectUser(id)
+	if err != nil {
+		utils.InternalServerError(w, "Failed to reject user")
+		return
+	}
+
+	claims := middleware.GetClaims(r)
+	userEmail := "admin"
+	var userID *string
+	if claims != nil {
+		userEmail = claims.Email
+		userID = &claims.UserID
+	}
+	h.auditRepo.Create(&models.CreateAuditLogRequest{
+		UserID:    userID,
+		UserEmail: userEmail,
+		Action:    "reject_user",
+		Entity:    "user",
+		EntityID:  &id,
+		IPAddress: r.RemoteAddr,
+	})
+
+	utils.Success(w, map[string]interface{}{
+		"success": true,
+		"message": "User registration has been rejected",
+		"user":    rejectedUser,
+	})
+}
+
+// extractActionID extracts the ID right before the action suffix (e.g. /api/users/{id}/approve -> {id})
+func extractActionID(path, action string) string {
+	trimmed := strings.Trim(path, "/")
+	parts := strings.Split(trimmed, "/")
+	for i := len(parts) - 1; i >= 0; i-- {
+		if parts[i] == action && i > 0 {
+			return parts[i-1]
+		}
+	}
+	return ""
 }
 
 // AuditHandler handles audit log HTTP requests

@@ -34,6 +34,16 @@ func New(baseURL, serviceKey string) *CoreClient {
 	}
 }
 
+// BaseURL returns the configured core service base URL
+func (c *CoreClient) BaseURL() string {
+	return c.baseURL
+}
+
+// ServiceKey returns the inter-service auth key
+func (c *CoreClient) ServiceKey() string {
+	return c.serviceKey
+}
+
 // doRequest makes an authenticated GET request to core-service-aws
 func (c *CoreClient) doRequest(path string) ([]byte, error) {
 	url := fmt.Sprintf("%s%s", c.baseURL, path)
@@ -67,6 +77,36 @@ func (c *CoreClient) doRequest(path string) ([]byte, error) {
 // DoRequest performs an authenticated GET request and returns raw response bytes
 func (c *CoreClient) DoRequest(path string) ([]byte, error) {
 	return c.doRequest(path)
+}
+
+// DoPostRequest performs an authenticated POST request to core-service-aws
+func (c *CoreClient) DoPostRequest(path string, body io.Reader) ([]byte, error) {
+	url := fmt.Sprintf("%s%s", c.baseURL, path)
+
+	req, err := http.NewRequest(http.MethodPost, url, body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+
+	req.Header.Set("X-Internal-Service-Key", c.serviceKey)
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("request to core-service-aws failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode == http.StatusUnauthorized {
+		return nil, fmt.Errorf("inter-service auth failed: check INTERNAL_SERVICE_KEY in both services")
+	}
+
+	data, err := io.ReadAll(resp.Body)
+	if resp.StatusCode >= 400 {
+		return data, fmt.Errorf("core-service-aws returned status %d: %s", resp.StatusCode, string(data))
+	}
+
+	return data, err
 }
 
 // GetStats fetches dashboard stats from core-service-aws

@@ -3,6 +3,7 @@ package handlers
 import (
 	"encoding/json"
 	"net/http"
+	"strings"
 
 	"core-service-aws/database"
 	"core-service-aws/middleware"
@@ -53,9 +54,37 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if user.ApprovalStatus == "pending" {
+		utils.Forbidden(w, "Your account is pending admin approval. You will receive an access code via email once approved.")
+		return
+	}
+	if user.ApprovalStatus == "rejected" {
+		utils.Forbidden(w, "Your registration request was declined by the administrator.")
+		return
+	}
 	if user.Status != "active" {
 		utils.Forbidden(w, "Account is disabled")
 		return
+	}
+
+	// Verify CRM Access Code (e.g. CRMU01)
+	if user.CRMCode != "" {
+		reqCode := strings.ToUpper(strings.TrimSpace(req.CRMCode))
+		expectedCode := strings.ToUpper(strings.TrimSpace(user.CRMCode))
+		if reqCode == "" {
+			utils.BadRequest(w, "CRM Access Code is required. Please check your approval email.")
+			return
+		}
+		if reqCode != expectedCode {
+			h.auditRepo.Create(&models.CreateAuditLogRequest{
+				UserEmail: req.Email,
+				Action:    "login_failed_invalid_crm_code",
+				Entity:    "auth",
+				IPAddress: r.RemoteAddr,
+			})
+			utils.Unauthorized(w, "Invalid CRM Access Code. Please check your approval email.")
+			return
+		}
 	}
 
 	token, err := utils.GenerateToken(user.ID, user.Email, user.Role, user.Name, 24*60*60*1e9)

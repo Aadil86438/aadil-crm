@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"net/http"
 	"strings"
-	"time"
 
 	"core-service-aws/models"
 	"core-service-aws/repositories"
@@ -61,27 +60,29 @@ func (h *RegistrationHandler) Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Directly create user as active
+	// Create user as pending approval (inactive until admin approves)
 	user, err := h.userRepo.Create(&models.CreateUserRequest{
-		Name:  req.Name,
-		Email: req.Email,
-		Role:  "admin", // First user registering company is admin
+		Name:           req.Name,
+		Email:          req.Email,
+		Role:           "sales_user",
+		CompanyName:    req.CompanyName,
+		ApprovalStatus: "pending",
 	}, hashedPassword)
 	if err != nil {
-		utils.InternalServerError(w, "Failed to create user account")
+		utils.InternalServerError(w, "Failed to submit registration request")
 		return
 	}
 
-	// Generate JWT Token
-	token, err := utils.GenerateToken(user.ID, user.Email, user.Role, user.Name, 24*time.Hour)
-	if err != nil {
-		utils.InternalServerError(w, "Failed to generate authentication token")
-		return
-	}
-
-	utils.Created(w, models.LoginResponse{
-		Token: token,
-		User:  user,
+	utils.Created(w, map[string]interface{}{
+		"message":           "Registration submitted successfully. Your account is pending admin approval. You will receive your CRM Access Code via email once approved.",
+		"requires_approval": true,
+		"user": map[string]interface{}{
+			"id":              user.ID,
+			"name":            user.Name,
+			"email":           user.Email,
+			"company_name":    user.CompanyName,
+			"approval_status": user.ApprovalStatus,
+		},
 	})
 }
 

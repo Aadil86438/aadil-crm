@@ -211,6 +211,18 @@
                 </div>
               </template>
 
+              <!-- CRM Access Code Column -->
+              <template v-slot:item.crm_code="{ item }">
+                <v-chip v-if="item.crm_code" small color="deep-purple lighten-5" class="deep-purple--text text--darken-2 font-weight-bold" label>
+                  <v-icon left x-small color="deep-purple">mdi-shield-key</v-icon>
+                  {{ item.crm_code }}
+                </v-chip>
+                <v-chip v-else small color="amber lighten-5" class="warning--text text--darken-2 font-weight-medium" label>
+                  <v-icon left x-small color="warning">mdi-clock-outline</v-icon>
+                  Awaiting
+                </v-chip>
+              </template>
+
               <!-- Transaction ID Column -->
               <template v-slot:item.transaction_id="{ item }">
                 <v-chip v-if="item.transaction_id" small outlined color="indigo font-weight-bold">
@@ -624,9 +636,13 @@
                 <div>
                   <div class="d-flex align-center">
                     <span class="text-h6 font-weight-black text--primary mr-2">Application Log Viewer</span>
-                    <v-chip color="teal" small label class="font-weight-bold white--text">DAILY LOGS</v-chip>
+                    <v-chip color="teal" small label class="font-weight-bold white--text mr-2">DAILY LOGS</v-chip>
+                    <v-chip :color="liveLogsConnected ? 'success' : 'amber darken-2'" small label class="font-weight-bold white--text">
+                      <v-icon left x-small>{{ liveLogsConnected ? 'mdi-broadcast' : 'mdi-sync' }}</v-icon>
+                      {{ liveLogsConnected ? 'LIVE STREAM ACTIVE' : 'CONNECTING LIVE...' }}
+                    </v-chip>
                   </div>
-                  <div class="text-body-2 grey--text">Browse, search, analyze & download daily API request logs from your CRM server</div>
+                  <div class="text-body-2 grey--text">Browse, search, analyze & watch live API request logs streamed from your CRM server</div>
                 </div>
               </div>
               <div class="d-flex align-center" style="gap: 12px">
@@ -689,6 +705,39 @@
               </v-card>
             </v-col>
           </v-row>
+
+          <!-- ⚡ Real-Time Live Activity Stream Box (Multi-Tab Live Sync) -->
+          <v-card class="pa-4 rounded-xl elevation-0 mb-6" style="background: #0F172A; border: 1px solid #1E293B;">
+            <div class="d-flex align-center justify-space-between mb-3 flex-wrap" style="gap: 8px">
+              <div class="d-flex align-center">
+                <div class="live-dot mr-2" :class="{ 'live-dot-active': liveLogsConnected }"></div>
+                <span class="text-subtitle-2 font-weight-bold white--text">Real-Time CRM Activity Stream (Multi-Tab Live Sync)</span>
+                <v-chip x-small :color="liveLogsConnected ? 'success' : 'amber darken-3'" dark label class="ml-3 font-weight-bold">
+                  {{ liveLogsConnected ? 'STREAM ACTIVE' : 'CONNECTING...' }}
+                </v-chip>
+              </div>
+              <div class="d-flex align-center" style="gap: 8px">
+                <span class="caption grey--text hidden-xs-only">Any activity saved in another tab appears here instantly</span>
+                <v-btn text x-small color="grey lighten-1" @click="liveRecentEntries = []">Clear</v-btn>
+              </div>
+            </div>
+            <div class="pa-3 rounded-lg" style="background: #020617; max-height: 240px; overflow-y: auto; font-family: 'JetBrains Mono', 'Fira Code', monospace; font-size: 12px;">
+              <div v-for="(entry, idx) in liveRecentEntries" :key="idx" class="py-1 d-flex align-center flex-wrap" style="border-bottom: 1px solid rgba(255,255,255,0.04); gap: 8px;">
+                <span class="grey--text text--darken-1" style="min-width: 80px;">[{{ entry.timestamp }}]</span>
+                <span v-if="entry.method" class="font-weight-bold" :class="'method-' + (entry.method || '').toLowerCase()">{{ entry.method }}</span>
+                <code v-if="entry.path" class="white--text font-weight-medium px-2 py-0" style="background: #1E293B; border-radius: 4px;">{{ entry.path }}</code>
+                <v-chip x-small :color="entry.status && entry.status.startsWith('2') ? 'success' : 'error'" dark label class="font-weight-bold">
+                  {{ entry.status }}
+                </v-chip>
+                <span v-if="entry.duration" class="grey--text text--lighten-1">{{ entry.duration }}</span>
+                <span v-if="entry.remote_addr" class="caption grey--text text--darken-2">{{ entry.remote_addr }}</span>
+              </div>
+              <div v-if="liveRecentEntries.length === 0" class="grey--text italic py-4 text-center">
+                <v-icon color="grey darken-2" small class="mr-1">mdi-broadcast</v-icon>
+                Waiting for CRM events... Any meeting, task, or activity you create and save in another tab will show up here immediately without refreshing!
+              </div>
+            </div>
+          </v-card>
 
           <!-- Log File Browser Table -->
           <v-card class="table-container-card mb-6" elevation="0">
@@ -932,6 +981,17 @@
           </v-dialog>
         </div>
       </div>
+
+      <!-- Notification Snackbar -->
+      <v-snackbar v-model="snackbar" :color="snackbarColor" :timeout="4500" top right elevation="6">
+        <div class="d-flex align-center font-weight-medium">
+          <v-icon left dark class="mr-2">{{ snackbarColor === 'success' ? 'mdi-check-circle' : 'mdi-alert-circle' }}</v-icon>
+          <span>{{ snackbarText }}</span>
+        </div>
+        <template v-slot:action="{ attrs }">
+          <v-btn text small v-bind="attrs" @click="snackbar = false">Dismiss</v-btn>
+        </template>
+      </v-snackbar>
     </v-container>
   </div>
 </template>
@@ -949,6 +1009,12 @@ export default {
       verifying: false,
       codeError: null,
       adminToken: null,
+      snackbar: false,
+      snackbarText: '',
+      snackbarColor: 'success',
+      liveEventSource: null,
+      liveLogsConnected: false,
+      liveRecentEntries: [],
       allRequests: [],
       loading: false,
       approving: null,
@@ -1004,6 +1070,7 @@ export default {
       headers: [
         { text: 'MEMBER DETAILS', value: 'name', sortable: true },
         { text: 'COMPANY / ORG', value: 'company_name', sortable: true },
+        { text: 'CRM ACCESS CODE', value: 'crm_code', sortable: true },
         { text: 'TRANSACTION ID', value: 'transaction_id', sortable: true },
         { text: 'REGISTRATION DATE', value: 'created_at', sortable: true },
         { text: 'STATUS', value: 'approval_status', sortable: true, align: 'center' },
@@ -1019,8 +1086,14 @@ export default {
         this.fetchK8sData()
       } else if (val === 3) {
         this.fetchLogFiles()
+        this.startLiveLogStream()
+      } else {
+        this.stopLiveLogStream()
       }
     }
+  },
+  beforeDestroy() {
+    this.stopLiveLogStream()
   },
   computed: {
     filteredRequests() {
@@ -1160,8 +1233,9 @@ export default {
         const raw = res.data?.data || []
         this.allRequests = (Array.isArray(raw) ? raw : []).map(u => ({
           ...u,
-          approval_status: u.approval_status || (u.is_active !== false ? 'approved' : 'pending'),
+          approval_status: u.approval_status || (u.status === 'active' ? 'approved' : 'pending'),
           company_name: u.company_name || 'Organization',
+          crm_code: u.crm_code || '',
         }))
       } catch (e) {
         if (e.response?.status === 401) {
@@ -1225,19 +1299,99 @@ export default {
     async approve(id) {
       this.approving = id
       try {
+        const res = await registrationService.approveUser(id, this.adminToken)
+        const assignedCode = res.data?.data?.crm_code || res.data?.crm_code || 'CRMU'
         const req = this.allRequests.find(r => r.id === id)
-        if (req) req.approval_status = 'approved'
+        if (req) {
+          req.approval_status = 'approved'
+          req.crm_code = assignedCode
+          req.status = 'active'
+        }
+        this.snackbarText = `User approved successfully! Assigned Code: ${assignedCode} (Notification email sent)`
+        this.snackbarColor = 'success'
+        this.snackbar = true
+      } catch (e) {
+        alert(e.response?.data?.message || 'Failed to approve user')
       } finally {
         this.approving = null
       }
     },
     async reject(id) {
+      if (!confirm('Are you sure you want to decline this registration request?')) return
       this.rejecting = id
       try {
+        await registrationService.rejectUser(id, this.adminToken)
         const req = this.allRequests.find(r => r.id === id)
-        if (req) req.approval_status = 'rejected'
+        if (req) {
+          req.approval_status = 'rejected'
+          req.status = 'inactive'
+        }
+        this.snackbarText = 'Registration request declined'
+        this.snackbarColor = 'error'
+        this.snackbar = true
+      } catch (e) {
+        alert(e.response?.data?.message || 'Failed to reject user')
       } finally {
         this.rejecting = null
+      }
+    },
+    startLiveLogStream() {
+      if (this.liveEventSource) return
+      const sseURL = registrationService.getLiveLogsStreamURL(this.adminToken)
+      try {
+        this.liveEventSource = new EventSource(sseURL)
+        this.liveEventSource.onopen = () => {
+          this.liveLogsConnected = true
+        }
+        this.liveEventSource.onmessage = (event) => {
+          if (!event.data) return
+          try {
+            const entry = JSON.parse(event.data)
+            this.handleLiveLogEntry(entry)
+          } catch (e) {
+            this.handleLiveLogEntry({ raw: event.data, timestamp: new Date().toLocaleTimeString() })
+          }
+        }
+        this.liveEventSource.onerror = () => {
+          this.liveLogsConnected = false
+        }
+      } catch (err) {
+        console.error('Failed to initialize live SSE stream', err)
+      }
+    },
+    stopLiveLogStream() {
+      if (this.liveEventSource) {
+        this.liveEventSource.close()
+        this.liveEventSource = null
+        this.liveLogsConnected = false
+      }
+    },
+    handleLiveLogEntry(entry) {
+      if (!this.logStats.today_requests) this.logStats.today_requests = 0
+      this.logStats.today_requests++
+      if (entry.status && (String(entry.status).startsWith('4') || String(entry.status).startsWith('5'))) {
+        if (!this.logStats.today_errors) this.logStats.today_errors = 0
+        this.logStats.today_errors++
+      }
+
+      this.liveRecentEntries.unshift(entry)
+      if (this.liveRecentEntries.length > 60) {
+        this.liveRecentEntries.pop()
+      }
+
+      if (this.logViewData && Array.isArray(this.logViewData.entries)) {
+        this.logViewData.entries.unshift(entry)
+        if (this.logViewData.total_requests !== undefined) {
+          this.logViewData.total_requests++
+        }
+        if (entry.status && (String(entry.status).startsWith('4') || String(entry.status).startsWith('5'))) {
+          if (this.logViewData.error_count !== undefined) {
+            this.logViewData.error_count++
+          }
+        }
+        if (entry.method && this.logViewData.method_counts) {
+          this.logViewData.method_counts[entry.method] = (this.logViewData.method_counts[entry.method] || 0) + 1
+        }
       }
     },
     logout() {
@@ -1577,4 +1731,27 @@ export default {
     padding: 12px !important;
   }
 }
+
+.live-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #F59E0B;
+  display: inline-block;
+  transition: all 0.3s ease;
+}
+.live-dot-active {
+  background: #10B981;
+  box-shadow: 0 0 10px #10B981;
+  animation: pulse-live-dot 1.6s infinite ease-in-out;
+}
+@keyframes pulse-live-dot {
+  0% { transform: scale(0.9); opacity: 0.8; }
+  50% { transform: scale(1.3); opacity: 1; }
+  100% { transform: scale(0.9); opacity: 0.8; }
+}
+.method-get { color: #34D399; }
+.method-post { color: #60A5FA; }
+.method-put { color: #FBBF24; }
+.method-delete { color: #F87171; }
 </style>

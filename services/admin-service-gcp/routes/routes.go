@@ -2,6 +2,7 @@ package routes
 
 import (
 	"net/http"
+	"strings"
 
 	"admin-service-gcp/coreclient"
 	"admin-service-gcp/config"
@@ -23,7 +24,7 @@ func Setup(cfg *config.Config) http.Handler {
 	// ── Local Admin Handlers (DevOps tools that run locally on GCP) ──────────
 	adminPanelH := handlers.NewAdminPanelHandler() // pure admin ops
 	k8sH := handlers.NewK8sHandler()
-	logViewerH := handlers.NewLogViewerHandler()
+	logViewerH := handlers.NewLogViewerHandler(core)
 
 	// ── Proxy Handlers (call core-service-aws on AWS via HTTP) ───────────────
 	coreStatsH := handlers.NewCoreStatsHandler(core)
@@ -101,6 +102,25 @@ func Setup(cfg *config.Config) http.Handler {
 		if r.Method == http.MethodGet {
 			logViewerH.DownloadLog(w, r)
 		}
+	})))
+	mux.Handle("/api/admin/logs/live", adminAuth(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet {
+			logViewerH.LiveLogs(w, r)
+		}
+	})))
+
+	// User approval and rejection proxies to core-service-aws
+	mux.Handle("/api/admin/users/", adminAuth(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		path := r.URL.Path
+		if strings.HasSuffix(path, "/approve") && r.Method == http.MethodPost {
+			coreUsersH.Approve(w, r)
+			return
+		}
+		if strings.HasSuffix(path, "/reject") && r.Method == http.MethodPost {
+			coreUsersH.Reject(w, r)
+			return
+		}
+		http.NotFound(w, r)
 	})))
 
 	// ─── CROSS-CLOUD PROXY ROUTES ─────────────────────────────────────────────
