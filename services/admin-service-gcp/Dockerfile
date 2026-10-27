@@ -1,12 +1,7 @@
-FROM golang:1.24-alpine AS builder
-WORKDIR /app
-COPY go.mod go.sum ./
-RUN go mod download
-COPY . .
-RUN CGO_ENABLED=0 GOOS=linux go build -p 1 -ldflags="-s -w" -o admin-service-gcp .
-
 FROM alpine:latest
+RUN apk add --no-cache ca-certificates
 WORKDIR /app
-COPY --from=builder /app/admin-service-gcp .
+COPY admin-service-gcp-linux ./admin-service-gcp
+RUN chmod +x ./admin-service-gcp
 EXPOSE 8081
 CMD ["./admin-service-gcp"]
