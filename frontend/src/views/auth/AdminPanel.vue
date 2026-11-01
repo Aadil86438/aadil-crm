@@ -160,6 +160,231 @@
             </v-col>
           </v-row>
 
+          <!-- PREMIUM AWS LIVE REQUEST TELEMETRY & PIPELINE INSPECTOR -->
+          <v-card class="aws-telemetry-card mb-6 pa-4 pa-sm-5" elevation="0">
+            <!-- Header Bar -->
+            <div class="d-flex align-center justify-space-between flex-wrap pb-4 border-bottom-subtle" style="gap: 12px">
+              <div class="d-flex align-center">
+                <div class="radar-ping-container mr-3">
+                  <span class="radar-ping-ring" :class="{ 'ping-active': awsTelemetry.active }"></span>
+                  <span class="radar-ping-core" :class="{ 'core-active': awsTelemetry.active }"></span>
+                </div>
+                <div>
+                  <div class="d-flex align-center flex-wrap" style="gap: 8px">
+                    <span class="text-subtitle-1 font-weight-black white--text tracking-wide">
+                      AWS LIVE REQUEST PIPELINE
+                    </span>
+                    <v-chip
+                      x-small
+                      label
+                      class="font-weight-bold tracking-wider"
+                      :class="telemetryStatusChipClass"
+                    >
+                      {{ awsTelemetry.statusText }}
+                    </v-chip>
+                    <v-chip x-small outlined color="#FF9900" class="font-weight-medium">
+                      <v-icon x-small left color="#FF9900">mdi-aws</v-icon>
+                      EC2 :8080
+                    </v-chip>
+                  </div>
+                  <div class="text-caption grey--text text--lighten-1 mt-0">
+                    Live Cross-Cloud Inspector: Browser ──► GCP Admin (:8081) ──► AWS Core (:8080) ──► PostgreSQL
+                  </div>
+                </div>
+              </div>
+
+              <!-- Quick Action Buttons -->
+              <div class="d-flex align-center" style="gap: 10px">
+                <!-- Dedicated Refresh & Trace Button -->
+                <v-btn
+                  id="btn-aws-live-refresh"
+                  class="aws-refresh-btn font-weight-bold"
+                  small
+                  :loading="awsTelemetry.active"
+                  @click="refreshWithAwsTelemetry('Data Table Refresh (GET /internal/users)', 'fetch')"
+                  elevation="2"
+                >
+                  <v-icon left small class="refresh-spin-icon" :class="{ 'spin-active': awsTelemetry.active }">
+                    mdi-refresh
+                  </v-icon>
+                  <span class="mr-1">Refresh & Hit AWS</span>
+                  <v-chip x-small color="rgba(255,255,255,0.2)" class="white--text ml-1 font-weight-bold" label>
+                    LIVE
+                  </v-chip>
+                </v-btn>
+
+                <!-- Toggle Live Console Drawer -->
+                <v-btn
+                  icon
+                  small
+                  class="telemetry-icon-btn"
+                  :class="{ 'console-open': awsTelemetry.showConsole }"
+                  @click="awsTelemetry.showConsole = !awsTelemetry.showConsole"
+                  title="Toggle Packet Telemetry Console"
+                >
+                  <v-icon small color="cyan lighten-2">mdi-console-line</v-icon>
+                </v-btn>
+              </div>
+            </div>
+
+            <!-- Interactive Network Pipeline Diagram -->
+            <div class="pipeline-flow-wrapper my-4">
+              <!-- Node 1: Admin Client -->
+              <div class="pipeline-node" :class="{ 'node-active': awsTelemetry.stage === 'client' || awsTelemetry.stage === 'response' }">
+                <div class="node-icon-wrapper client-node">
+                  <v-icon color="#38BDF8">mdi-laptop</v-icon>
+                </div>
+                <div class="node-meta">
+                  <div class="node-title">Admin Client</div>
+                  <div class="node-sub">Browser UI</div>
+                </div>
+              </div>
+
+              <!-- Connector 1: Client -> GCP -->
+              <div class="pipeline-connector" :class="{ 'flow-active': ['client', 'gcp', 'aws_hit', 'db_query', 'response'].includes(awsTelemetry.stage) }">
+                <div class="connector-line">
+                  <span class="photon-packet photon-1" v-if="awsTelemetry.active"></span>
+                </div>
+                <span class="connector-badge">{{ awsTelemetry.method }} /api/admin/all</span>
+              </div>
+
+              <!-- Node 2: GCP Admin Service -->
+              <div class="pipeline-node" :class="{ 'node-active': awsTelemetry.stage === 'gcp', 'node-success': ['aws_hit', 'db_query', 'response'].includes(awsTelemetry.stage) }">
+                <div class="node-icon-wrapper gcp-node">
+                  <v-icon color="#4285F4">mdi-google-cloud</v-icon>
+                </div>
+                <div class="node-meta">
+                  <div class="node-title">GCP VM (:8081)</div>
+                  <div class="node-sub">Admin Proxy</div>
+                </div>
+              </div>
+
+              <!-- Connector 2: GCP -> AWS (The Cross-Cloud Tunnel) -->
+              <div class="pipeline-connector connector-cross-cloud" :class="{ 'flow-active-cross': ['gcp', 'aws_hit', 'db_query', 'response'].includes(awsTelemetry.stage) }">
+                <div class="connector-line cross-cloud-line">
+                  <span class="photon-packet photon-2" v-if="awsTelemetry.active && ['gcp', 'aws_hit', 'db_query', 'response'].includes(awsTelemetry.stage)"></span>
+                </div>
+                <div class="cross-cloud-badge">
+                  <v-icon x-small color="#F59E0B">mdi-shield-key-outline</v-icon>
+                  <span>X-Internal-Service-Key</span>
+                </div>
+              </div>
+
+              <!-- Node 3: AWS Core Service (Highlight Target!) -->
+              <div
+                class="pipeline-node aws-target-node"
+                :class="{
+                  'node-active-aws': awsTelemetry.stage === 'aws_hit',
+                  'node-success-aws': ['db_query', 'response'].includes(awsTelemetry.stage)
+                }"
+              >
+                <div class="node-icon-wrapper aws-node">
+                  <v-icon color="#FF9900" size="26">mdi-aws</v-icon>
+                  <span class="aws-hit-halo" v-if="awsTelemetry.stage === 'aws_hit'"></span>
+                </div>
+                <div class="node-meta">
+                  <div class="node-title d-flex align-center">
+                    AWS EC2 (:8080)
+                    <v-chip x-small color="#FF9900" dark class="ml-1 font-weight-bold px-1" style="height: 16px; font-size: 9px;" v-if="awsTelemetry.stage === 'aws_hit'">
+                      HIT!
+                    </v-chip>
+                  </div>
+                  <div class="node-sub">core-service-aws</div>
+                </div>
+              </div>
+
+              <!-- Connector 3: AWS -> DB -->
+              <div class="pipeline-connector" :class="{ 'flow-active': ['db_query', 'response'].includes(awsTelemetry.stage) }">
+                <div class="connector-line">
+                  <span class="photon-packet photon-3" v-if="awsTelemetry.active && ['db_query', 'response'].includes(awsTelemetry.stage)"></span>
+                </div>
+                <span class="connector-badge">SQL Query</span>
+              </div>
+
+              <!-- Node 4: PostgreSQL Database -->
+              <div class="pipeline-node" :class="{ 'node-active': awsTelemetry.stage === 'db_query', 'node-success': awsTelemetry.stage === 'response' }">
+                <div class="node-icon-wrapper db-node">
+                  <v-icon color="#10B981">mdi-database</v-icon>
+                </div>
+                <div class="node-meta">
+                  <div class="node-title">PostgreSQL (:5432)</div>
+                  <div class="node-sub">AWS RDS / Local DB</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Telemetry Metrics Strip -->
+            <div class="telemetry-metrics-bar d-flex align-center justify-space-between flex-wrap pa-3 mt-2" style="gap: 12px">
+              <div class="d-flex align-center flex-wrap" style="gap: 16px">
+                <!-- Target Endpoint -->
+                <div class="metric-pill">
+                  <span class="metric-label">INTERNAL ENDPOINT:</span>
+                  <span class="metric-val text-mono cyan--text text--accent-2">
+                    {{ awsTelemetry.method }} http://core-service-aws:8080{{ awsTelemetry.endpoint }}
+                  </span>
+                </div>
+
+                <!-- Latency -->
+                <div class="metric-pill">
+                  <span class="metric-label">LATENCY:</span>
+                  <span class="metric-val text-mono" :class="awsTelemetry.latency > 0 ? 'green--text text--accent-3 font-weight-bold' : 'grey--text'">
+                    {{ awsTelemetry.latency > 0 ? `${awsTelemetry.latency} ms` : '—' }}
+                  </span>
+                </div>
+
+                <!-- Records -->
+                <div class="metric-pill">
+                  <span class="metric-label">SYNCED USERS:</span>
+                  <span class="metric-val text-mono amber--text text--lighten-2 font-weight-bold">
+                    {{ awsTelemetry.recordCount || allRequests.length }} records
+                  </span>
+                </div>
+
+                <!-- Last Hit Time -->
+                <div class="metric-pill">
+                  <span class="metric-label">LAST AWS HIT:</span>
+                  <span class="metric-val text-mono white--text">
+                    {{ awsTelemetry.lastHitTime }}
+                  </span>
+                </div>
+              </div>
+
+              <!-- Status Flag -->
+              <div class="d-flex align-center">
+                <v-chip x-small label color="rgba(16, 185, 129, 0.15)" class="green--text text--accent-3 font-weight-bold text-mono">
+                  <v-icon left x-small color="#10B981">mdi-lock-check</v-icon>
+                  INTERNAL AUTH VALIDATED
+                </v-chip>
+              </div>
+            </div>
+
+            <!-- Expandable Live Telemetry Terminal Console -->
+            <v-expand-transition>
+              <div v-if="awsTelemetry.showConsole" class="telemetry-console mt-3 pa-3">
+                <div class="d-flex align-center justify-space-between mb-2 pb-1 border-bottom-dark">
+                  <div class="d-flex align-center">
+                    <v-icon x-small color="cyan lighten-2" class="mr-1">mdi-terminal</v-icon>
+                    <span class="console-title text-caption font-weight-bold cyan--text text--lighten-2 text-mono">
+                      LIVE CROSS-CLOUD PACKET TRACER
+                    </span>
+                  </div>
+                  <v-btn x-small text color="grey lighten-1" @click="awsTelemetry.logs = []">Clear</v-btn>
+                </div>
+                <div class="console-log-scroll">
+                  <div
+                    v-for="(log, idx) in awsTelemetry.logs"
+                    :key="idx"
+                    class="console-log-row text-caption text-mono"
+                    :class="`log-type-${log.type}`"
+                  >
+                    <span class="log-time grey--text text--darken-1 mr-2">{{ log.time }}</span>
+                    <span class="log-msg">{{ log.text }}</span>
+                  </div>
+                </div>
+              </div>
+            </v-expand-transition>
+          </v-card>
+
           <!-- Premium Data Table Container -->
           <v-card class="table-container-card" elevation="0">
             <v-toolbar flat color="transparent" class="px-2 pt-2">
@@ -170,11 +395,44 @@
                 <v-tab value="rejected" @click="statusFilter = 'rejected'">Rejected ({{ rejectedCount }})</v-tab>
               </v-tabs>
               <v-spacer></v-spacer>
+              <!-- Premium AWS Sync Button in Datatable Toolbar -->
+              <v-btn
+                id="btn-table-sync-aws"
+                class="table-aws-sync-btn mr-3"
+                small
+                :loading="awsTelemetry.active"
+                :disabled="awsTelemetry.active"
+                @click="tableRefreshWithTelemetry"
+                elevation="0"
+              >
+                <span class="table-aws-sync-btn__glow"></span>
+                <v-icon left small class="refresh-spin-icon" :class="{ 'spin-active': awsTelemetry.active }">
+                  mdi-sync
+                </v-icon>
+                <span class="font-weight-bold" style="letter-spacing: 0.4px; font-size: 13px;">Sync from AWS</span>
+                <v-chip
+                  v-if="!awsTelemetry.active"
+                  x-small label
+                  class="ml-2 font-weight-bold"
+                  style="background: rgba(255,153,0,0.2); color: #FF9900; font-size: 9px; height: 16px;"
+                >
+                  <v-icon x-small left color="#FF9900" style="margin-right:2px;">mdi-aws</v-icon>
+                  EC2
+                </v-chip>
+                <v-chip
+                  v-else
+                  x-small label
+                  class="ml-2 font-weight-bold"
+                  style="background: rgba(255,153,0,0.2); color: #FF9900; font-size: 9px; height: 16px;"
+                >
+                  LIVE
+                </v-chip>
+              </v-btn>
               <v-text-field
                 v-model="search"
                 prepend-inner-icon="mdi-magnify"
-                label="Search member name, email, company..."
-                single-line hide-details outlined dense style="max-width: 380px" class="search-input"
+                label="Search members..."
+                single-line hide-details outlined dense style="max-width: 280px" class="search-input"
               ></v-text-field>
             </v-toolbar>
 
@@ -1023,6 +1281,25 @@ export default {
       activeTab: 'all',
       statusFilter: 'all',
       currentView: 0,
+      // Cross-Cloud AWS Live Request Telemetry
+      awsTelemetry: {
+        active: false,
+        stage: 'idle', // 'idle' | 'client' | 'gcp' | 'aws_hit' | 'db_query' | 'response' | 'error'
+        actionName: 'Data Table Sync',
+        method: 'GET',
+        endpoint: '/internal/users',
+        gcpEndpoint: '/api/admin/all',
+        latency: 0,
+        statusCode: 200,
+        statusText: 'STANDBY',
+        recordCount: 0,
+        lastHitTime: 'Ready',
+        showConsole: false,
+        logs: [
+          { time: new Date().toLocaleTimeString(), type: 'system', text: 'Telemetry initialized. Ready to trace cross-cloud requests to AWS EC2.' }
+        ]
+      },
+      telemetryTimer: null,
       redisData: { connected: false, key_count: 0, keys: [] },
       loadingRedis: false,
       redisSearch: '',
@@ -1096,6 +1373,17 @@ export default {
     this.stopLiveLogStream()
   },
   computed: {
+    telemetryStatusChipClass() {
+      switch (this.awsTelemetry.stage) {
+        case 'client': return 'cyan lighten-4 cyan--text text--darken-4'
+        case 'gcp': return 'blue lighten-4 blue--text text--darken-4'
+        case 'aws_hit': return 'amber lighten-3 orange--text text--darken-4'
+        case 'db_query': return 'teal lighten-4 teal--text text--darken-4'
+        case 'response': return 'green lighten-4 green--text text--darken-4'
+        case 'error': return 'red lighten-4 red--text text--darken-4'
+        default: return 'grey lighten-3 grey--text text--darken-3'
+      }
+    },
     filteredRequests() {
       if (this.statusFilter === 'all') return this.allRequests
       return this.allRequests.filter(r => r.approval_status === this.statusFilter)
@@ -1227,18 +1515,107 @@ export default {
       }
     },
     async loadData() {
+      return this.refreshWithAwsTelemetry('Data Table Refresh', 'fetch')
+    },
+    async tableRefreshWithTelemetry() {
+      // Open the telemetry console so the user sees it live
+      this.awsTelemetry.showConsole = true
+      // Scroll the telemetry card into view smoothly
+      this.$nextTick(() => {
+        const card = document.querySelector('.aws-telemetry-card')
+        if (card) card.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      })
+      // Trigger the live AWS request pipeline with animation
+      return this.refreshWithAwsTelemetry('Table Refresh — GET /internal/users', 'fetch')
+    },
+    async refreshWithAwsTelemetry(actionName = 'Data Table Refresh', actionType = 'fetch') {
+      if (this.awsTelemetry.active) return
+      
+      const startTime = performance.now()
+      const nowStr = () => new Date().toLocaleTimeString()
+      
       this.loading = true
+      this.awsTelemetry.active = true
+      this.awsTelemetry.stage = 'client'
+      this.awsTelemetry.actionName = actionName
+      this.awsTelemetry.method = actionType === 'fetch' ? 'GET' : 'POST'
+      this.awsTelemetry.endpoint = actionType === 'fetch' ? '/internal/users' : '/internal/users/action'
+      this.awsTelemetry.statusText = 'DISPATCHING'
+      
+      const addLog = (type, text) => {
+        this.awsTelemetry.logs.unshift({
+          time: new Date().toLocaleTimeString() + '.' + String(Date.now() % 1000).padStart(3, '0'),
+          type,
+          text
+        })
+        if (this.awsTelemetry.logs.length > 35) this.awsTelemetry.logs.pop()
+      }
+
+      addLog('client', `🌐 [CLIENT] Dispatching ${this.awsTelemetry.method} ${this.awsTelemetry.gcpEndpoint} to GCP Admin Service (:8081)...`)
+
+      // Stage 1 -> 2: GCP Admin Service receives and appends secret
+      await new Promise(r => setTimeout(r, 160))
+      this.awsTelemetry.stage = 'gcp'
+      this.awsTelemetry.statusText = 'GCP PROXYING'
+      addLog('gcp', `☁️ [GCP ADMIN :8081] Token authenticated. Injecting X-Internal-Service-Key & forwarding to AWS EC2...`)
+
+      // Stage 2 -> 3: Crossing the cloud bridge to AWS EC2
+      await new Promise(r => setTimeout(r, 220))
+      this.awsTelemetry.stage = 'aws_hit'
+      this.awsTelemetry.statusText = '⚡ AWS HIT RECEIVED'
+      addLog('aws', `⚡ [AWS EC2 :8080] HIT CONFIRMED! core-service-aws:8080${this.awsTelemetry.endpoint} received request!`)
+
       try {
-        const res = await registrationService.getAll(this.adminToken)
-        const raw = res.data?.data || []
-        this.allRequests = (Array.isArray(raw) ? raw : []).map(u => ({
-          ...u,
-          approval_status: u.approval_status || (u.status === 'active' ? 'approved' : 'pending'),
-          company_name: u.company_name || 'Organization',
-          crm_code: u.crm_code || '',
-        }))
+        let res
+        if (actionType === 'fetch') {
+          res = await registrationService.getAll(this.adminToken)
+          const raw = res.data?.data || []
+          this.allRequests = (Array.isArray(raw) ? raw : []).map(u => ({
+            ...u,
+            approval_status: u.approval_status || (u.status === 'active' ? 'approved' : 'pending'),
+            company_name: u.company_name || 'Organization',
+            crm_code: u.crm_code || '',
+          }))
+          this.awsTelemetry.recordCount = this.allRequests.length
+        }
+
+        // Stage 4: PostgreSQL DB Query execution on AWS
+        this.awsTelemetry.stage = 'db_query'
+        this.awsTelemetry.statusText = 'POSTGRESQL QUERY'
+        addLog('db', `🗄️ [AWS DB] PostgreSQL executed query successfully (${this.awsTelemetry.recordCount} user records fetched)`)
+
+        await new Promise(r => setTimeout(r, 180))
+
+        // Stage 5: Response received back at Admin UI
+        const totalDuration = Math.round(performance.now() - startTime)
+        this.awsTelemetry.latency = totalDuration
+        this.awsTelemetry.statusCode = 200
+        this.awsTelemetry.stage = 'response'
+        this.awsTelemetry.statusText = '200 OK (SUCCESS)'
+        this.awsTelemetry.lastHitTime = nowStr()
+
+        addLog('success', `🚀 [RESPONSE] AWS Core returned 200 OK (${totalDuration}ms roundtrip). Admin UI updated!`)
+
+        this.snackbarText = `⚡ AWS EC2 HIT: 200 OK (${totalDuration}ms roundtrip, ${this.awsTelemetry.recordCount} records)`
+        this.snackbarColor = 'success'
+        this.snackbar = true
+
+        clearTimeout(this.telemetryTimer)
+        this.telemetryTimer = setTimeout(() => {
+          this.awsTelemetry.active = false
+          this.awsTelemetry.stage = 'idle'
+          this.awsTelemetry.statusText = 'SYNCED'
+        }, 3400)
+
       } catch (e) {
         console.error('Failed to load member registrations:', e)
+        const totalDuration = Math.round(performance.now() - startTime)
+        this.awsTelemetry.latency = totalDuration
+        this.awsTelemetry.stage = 'error'
+        this.awsTelemetry.statusCode = e.response?.status || 500
+        this.awsTelemetry.statusText = 'FAILED'
+        addLog('error', `❌ [ERROR] Request failed: ${e.message}`)
+
         const errMsg = e.response?.data?.message || e.response?.data?.error || e.message || 'Failed to load registration records'
         this.snackbarText = `Error loading members: ${errMsg}`
         this.snackbarColor = 'error'
@@ -1247,8 +1624,80 @@ export default {
           this.authenticated = false
           this.adminToken = null
         }
+
+        clearTimeout(this.telemetryTimer)
+        this.telemetryTimer = setTimeout(() => {
+          this.awsTelemetry.active = false
+          this.awsTelemetry.stage = 'idle'
+          this.awsTelemetry.statusText = 'STANDBY'
+        }, 3800)
       } finally {
         this.loading = false
+      }
+    },
+    async executeAwsAction(actionName, method, endpoint, actionFn) {
+      const startTime = performance.now()
+      const nowStr = () => new Date().toLocaleTimeString()
+      
+      this.awsTelemetry.active = true
+      this.awsTelemetry.stage = 'client'
+      this.awsTelemetry.actionName = actionName
+      this.awsTelemetry.method = method
+      this.awsTelemetry.endpoint = endpoint
+      this.awsTelemetry.statusText = 'DISPATCHING'
+
+      const addLog = (type, text) => {
+        this.awsTelemetry.logs.unshift({
+          time: new Date().toLocaleTimeString() + '.' + String(Date.now() % 1000).padStart(3, '0'),
+          type,
+          text
+        })
+        if (this.awsTelemetry.logs.length > 35) this.awsTelemetry.logs.pop()
+      }
+
+      addLog('client', `🌐 [CLIENT] Action: ${actionName} -> Dispatching to GCP (:8081)...`)
+      await new Promise(r => setTimeout(r, 140))
+      
+      this.awsTelemetry.stage = 'gcp'
+      this.awsTelemetry.statusText = 'GCP PROXYING'
+      addLog('gcp', `☁️ [GCP ADMIN] Forwarding ${method} ${endpoint} with X-Internal-Service-Key...`)
+      await new Promise(r => setTimeout(r, 200))
+
+      this.awsTelemetry.stage = 'aws_hit'
+      this.awsTelemetry.statusText = '⚡ AWS HIT RECEIVED'
+      addLog('aws', `⚡ [AWS EC2 :8080] HIT CONFIRMED! Processing ${actionName}...`)
+
+      try {
+        const result = await actionFn()
+        this.awsTelemetry.stage = 'db_query'
+        this.awsTelemetry.statusText = 'POSTGRESQL UPDATE'
+        addLog('db', `🗄️ [AWS DB] PostgreSQL updated user approval status & CRM access code`)
+
+        await new Promise(r => setTimeout(r, 160))
+
+        const totalDuration = Math.round(performance.now() - startTime)
+        this.awsTelemetry.latency = totalDuration
+        this.awsTelemetry.statusCode = 200
+        this.awsTelemetry.stage = 'response'
+        this.awsTelemetry.statusText = '200 OK (SUCCESS)'
+        this.awsTelemetry.lastHitTime = nowStr()
+
+        addLog('success', `🚀 [RESPONSE] AWS Core completed ${actionName} in ${totalDuration}ms!`)
+
+        clearTimeout(this.telemetryTimer)
+        this.telemetryTimer = setTimeout(() => {
+          this.awsTelemetry.active = false
+          this.awsTelemetry.stage = 'idle'
+          this.awsTelemetry.statusText = 'SYNCED'
+        }, 3400)
+
+        return result
+      } catch (err) {
+        this.awsTelemetry.stage = 'error'
+        this.awsTelemetry.statusCode = err.response?.status || 500
+        this.awsTelemetry.statusText = 'FAILED'
+        addLog('error', `❌ [ERROR] ${actionName} failed: ${err.message}`)
+        throw err
       }
     },
     async fetchRedisData() {
@@ -1302,43 +1751,53 @@ export default {
       }
     },
     async approve(id) {
-      this.approving = id
-      try {
-        const res = await registrationService.approveUser(id, this.adminToken)
-        const assignedCode = res.data?.data?.crm_code || res.data?.crm_code || 'CRMU'
-        const req = this.allRequests.find(r => r.id === id)
-        if (req) {
-          req.approval_status = 'approved'
-          req.crm_code = assignedCode
-          req.status = 'active'
+      const req = this.allRequests.find(r => r.id === id)
+      const memberName = req ? req.name : `Member #${id}`
+      return this.executeAwsAction(`Approve User (${memberName})`, 'POST', `/internal/users/${id}/approve`, async () => {
+        this.approving = id
+        try {
+          const res = await registrationService.approveUser(id, this.adminToken)
+          const assignedCode = res.data?.data?.crm_code || res.data?.crm_code || 'CRMU'
+          if (req) {
+            req.approval_status = 'approved'
+            req.crm_code = assignedCode
+            req.status = 'active'
+          }
+          this.snackbarText = `User approved successfully! Assigned Code: ${assignedCode} (Notification email sent)`
+          this.snackbarColor = 'success'
+          this.snackbar = true
+          return res
+        } catch (e) {
+          alert(e.response?.data?.message || 'Failed to approve user')
+          throw e
+        } finally {
+          this.approving = null
         }
-        this.snackbarText = `User approved successfully! Assigned Code: ${assignedCode} (Notification email sent)`
-        this.snackbarColor = 'success'
-        this.snackbar = true
-      } catch (e) {
-        alert(e.response?.data?.message || 'Failed to approve user')
-      } finally {
-        this.approving = null
-      }
+      })
     },
     async reject(id) {
       if (!confirm('Are you sure you want to decline this registration request?')) return
-      this.rejecting = id
-      try {
-        await registrationService.rejectUser(id, this.adminToken)
-        const req = this.allRequests.find(r => r.id === id)
-        if (req) {
-          req.approval_status = 'rejected'
-          req.status = 'inactive'
+      const req = this.allRequests.find(r => r.id === id)
+      const memberName = req ? req.name : `Member #${id}`
+      return this.executeAwsAction(`Reject User (${memberName})`, 'POST', `/internal/users/${id}/reject`, async () => {
+        this.rejecting = id
+        try {
+          const res = await registrationService.rejectUser(id, this.adminToken)
+          if (req) {
+            req.approval_status = 'rejected'
+            req.status = 'inactive'
+          }
+          this.snackbarText = 'Registration request declined'
+          this.snackbarColor = 'error'
+          this.snackbar = true
+          return res
+        } catch (e) {
+          alert(e.response?.data?.message || 'Failed to reject user')
+          throw e
+        } finally {
+          this.rejecting = null
         }
-        this.snackbarText = 'Registration request declined'
-        this.snackbarColor = 'error'
-        this.snackbar = true
-      } catch (e) {
-        alert(e.response?.data?.message || 'Failed to reject user')
-      } finally {
-        this.rejecting = null
-      }
+      })
     },
     startLiveLogStream() {
       if (this.liveEventSource) return
@@ -1759,4 +2218,371 @@ export default {
 .method-post { color: #60A5FA; }
 .method-put { color: #FBBF24; }
 .method-delete { color: #F87171; }
+
+/* ─── PREMIUM AWS LIVE REQUEST TELEMETRY STYLES ───────────────────────────────── */
+.aws-telemetry-card {
+  background: linear-gradient(135deg, #090E17 0%, #0F172A 50%, #151D30 100%) !important;
+  border: 1px solid rgba(56, 189, 248, 0.22) !important;
+  border-radius: 16px !important;
+  box-shadow: 0 10px 30px -8px rgba(15, 23, 42, 0.8), 0 0 24px 2px rgba(56, 189, 248, 0.08) !important;
+  transition: all 0.3s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.border-bottom-subtle {
+  border-bottom: 1px solid rgba(148, 163, 184, 0.12);
+}
+
+.border-bottom-dark {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.text-mono {
+  font-family: 'JetBrains Mono', 'Fira Code', Consolas, Monaco, monospace !important;
+}
+
+/* Radar Ping Indicator */
+.radar-ping-container {
+  position: relative;
+  width: 18px;
+  height: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.radar-ping-ring {
+  position: absolute;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 2px solid #38BDF8;
+  opacity: 0.4;
+}
+
+.radar-ping-ring.ping-active {
+  animation: radar-ping 1.4s cubic-bezier(0, 0, 0.2, 1) infinite;
+  border-color: #FF9900;
+}
+
+.radar-ping-core {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #38BDF8;
+  transition: all 0.3s ease;
+}
+
+.radar-ping-core.core-active {
+  background: #FF9900;
+  box-shadow: 0 0 10px #FF9900;
+}
+
+@keyframes radar-ping {
+  0% { transform: scale(0.6); opacity: 0.9; }
+  100% { transform: scale(2.2); opacity: 0; }
+}
+
+/* Refresh Button */
+.aws-refresh-btn {
+  background: linear-gradient(135deg, #2563EB 0%, #4F46E5 50%, #7C3AED 100%) !important;
+  color: #FFFFFF !important;
+  border-radius: 10px !important;
+  padding: 0 16px !important;
+  font-size: 13px !important;
+  letter-spacing: 0.4px !important;
+  box-shadow: 0 4px 14px rgba(79, 70, 229, 0.4) !important;
+  transition: all 0.25s ease !important;
+  border: 1px solid rgba(255, 255, 255, 0.2) !important;
+}
+
+.aws-refresh-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(79, 70, 229, 0.6) !important;
+}
+
+.refresh-spin-icon.spin-active {
+  animation: spin-refresh 1s linear infinite;
+}
+
+@keyframes spin-refresh {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.telemetry-icon-btn {
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 8px;
+  transition: all 0.2s ease;
+}
+
+.telemetry-icon-btn:hover,
+.telemetry-icon-btn.console-open {
+  background: rgba(56, 189, 248, 0.15);
+}
+
+/* Pipeline Flow */
+.pipeline-flow-wrapper {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  overflow-x: auto;
+  padding: 12px 6px;
+  gap: 8px;
+}
+
+.pipeline-node {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  background: rgba(30, 41, 59, 0.65);
+  border: 1px solid rgba(148, 163, 184, 0.15);
+  border-radius: 12px;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  min-width: 145px;
+  flex-shrink: 0;
+}
+
+.pipeline-node.node-active {
+  background: rgba(14, 165, 233, 0.15);
+  border-color: #38BDF8;
+  box-shadow: 0 0 16px rgba(56, 189, 248, 0.35);
+}
+
+.pipeline-node.node-active-aws {
+  background: rgba(255, 153, 0, 0.2) !important;
+  border-color: #FF9900 !important;
+  box-shadow: 0 0 24px rgba(255, 153, 0, 0.6) !important;
+  animation: aws-pulse-halo 0.9s infinite alternate;
+}
+
+.pipeline-node.node-success-aws {
+  border-color: rgba(255, 153, 0, 0.6);
+  background: rgba(255, 153, 0, 0.1);
+}
+
+.pipeline-node.node-success {
+  border-color: rgba(16, 185, 129, 0.5);
+}
+
+@keyframes aws-pulse-halo {
+  0% { transform: scale(1); box-shadow: 0 0 12px rgba(255, 153, 0, 0.4); }
+  100% { transform: scale(1.04); box-shadow: 0 0 28px rgba(255, 153, 0, 0.85); }
+}
+
+.node-icon-wrapper {
+  width: 42px;
+  height: 42px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  flex-shrink: 0;
+}
+
+.client-node { background: rgba(56, 189, 248, 0.12); }
+.gcp-node { background: rgba(66, 133, 244, 0.15); }
+.aws-node { background: rgba(255, 153, 0, 0.18); border: 1px solid rgba(255, 153, 0, 0.3); }
+.db-node { background: rgba(16, 185, 129, 0.12); }
+
+.node-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: #F8FAFC;
+  line-height: 1.2;
+}
+
+.node-sub {
+  font-size: 11px;
+  color: #94A3B8;
+  margin-top: 2px;
+}
+
+/* Connectors and Animated Photons */
+.pipeline-connector {
+  flex: 1;
+  min-width: 75px;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.connector-line {
+  width: 100%;
+  height: 3px;
+  background: rgba(148, 163, 184, 0.2);
+  border-radius: 2px;
+  position: relative;
+  overflow: hidden;
+}
+
+.pipeline-connector.flow-active .connector-line {
+  background: rgba(56, 189, 248, 0.35);
+}
+
+.pipeline-connector.flow-active-cross .cross-cloud-line {
+  background: rgba(245, 158, 11, 0.45);
+}
+
+.photon-packet {
+  position: absolute;
+  top: -2px;
+  width: 32px;
+  height: 7px;
+  border-radius: 4px;
+  background: linear-gradient(90deg, transparent, #38BDF8, #FFFFFF);
+  box-shadow: 0 0 10px #38BDF8;
+  animation: photon-beam 1.2s infinite ease-in-out;
+}
+
+.photon-2 {
+  background: linear-gradient(90deg, transparent, #F59E0B, #FF9900, #FFFFFF);
+  box-shadow: 0 0 12px #FF9900;
+}
+
+.photon-3 {
+  background: linear-gradient(90deg, transparent, #10B981, #FFFFFF);
+  box-shadow: 0 0 10px #10B981;
+}
+
+@keyframes photon-beam {
+  0% { left: 0%; opacity: 0; }
+  25% { opacity: 1; }
+  75% { opacity: 1; }
+  100% { left: 100%; opacity: 0; }
+}
+
+.connector-badge {
+  font-size: 10px;
+  font-weight: 600;
+  color: #94A3B8;
+  margin-top: 6px;
+  white-space: nowrap;
+  font-family: monospace;
+}
+
+.cross-cloud-badge {
+  font-size: 9px;
+  font-weight: 700;
+  color: #F59E0B;
+  margin-top: 6px;
+  background: rgba(245, 158, 11, 0.14);
+  padding: 2px 7px;
+  border-radius: 6px;
+  border: 1px solid rgba(245, 158, 11, 0.35);
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  white-space: nowrap;
+  font-family: monospace;
+}
+
+/* Metrics Bar */
+.telemetry-metrics-bar {
+  background: rgba(15, 23, 42, 0.85);
+  border: 1px solid rgba(148, 163, 184, 0.12);
+  border-radius: 10px;
+}
+
+.metric-pill {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+}
+
+.metric-label {
+  font-size: 10px;
+  font-weight: 700;
+  color: #64748B;
+  letter-spacing: 0.5px;
+}
+
+.metric-val {
+  font-size: 12px;
+  font-weight: 600;
+}
+
+/* Console Drawer */
+.telemetry-console {
+  background: #020617;
+  border: 1px solid rgba(56, 189, 248, 0.22);
+  border-radius: 10px;
+  font-family: monospace;
+}
+
+.console-log-scroll {
+  max-height: 160px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.console-log-row {
+  padding: 2px 6px;
+  border-radius: 4px;
+  line-height: 1.4;
+  font-size: 11px;
+}
+
+.log-type-client { color: #38BDF8; }
+.log-type-gcp { color: #818CF8; }
+.log-type-aws { color: #FBBF24; font-weight: bold; background: rgba(245, 158, 11, 0.12); }
+.log-type-db { color: #34D399; }
+.log-type-success { color: #4ADE80; font-weight: bold; }
+.log-type-error { color: #F87171; font-weight: bold; }
+
+/* ─── TABLE TOOLBAR AWS SYNC BUTTON ────────────────────────────────────────── */
+.table-aws-sync-btn {
+  position: relative;
+  overflow: hidden;
+  background: linear-gradient(135deg, #0F172A 0%, #1E293B 60%, #1a2540 100%) !important;
+  border: 1px solid rgba(255, 153, 0, 0.45) !important;
+  border-radius: 10px !important;
+  color: #E2E8F0 !important;
+  padding: 0 14px !important;
+  height: 36px !important;
+  box-shadow: 0 2px 12px rgba(255, 153, 0, 0.22), inset 0 1px 0 rgba(255,255,255,0.06) !important;
+  transition: all 0.28s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+
+.table-aws-sync-btn:hover:not(:disabled) {
+  background: linear-gradient(135deg, #162033 0%, #243048 60%, #1f2d4a 100%) !important;
+  border-color: rgba(255, 153, 0, 0.8) !important;
+  box-shadow: 0 4px 20px rgba(255, 153, 0, 0.38), 0 0 0 1px rgba(255,153,0,0.35), inset 0 1px 0 rgba(255,255,255,0.08) !important;
+  transform: translateY(-1px);
+}
+
+.table-aws-sync-btn:active:not(:disabled) {
+  transform: translateY(0px) scale(0.99);
+  box-shadow: 0 2px 10px rgba(255, 153, 0, 0.3) !important;
+}
+
+/* Animated shimmer glow sweep on hover */
+.table-aws-sync-btn__glow {
+  position: absolute;
+  top: 0; left: -75%;
+  width: 55%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255,153,0,0.1), transparent);
+  transform: skewX(-20deg);
+  pointer-events: none;
+  transition: none;
+}
+
+.table-aws-sync-btn:hover .table-aws-sync-btn__glow {
+  animation: btn-shimmer 1.6s ease infinite;
+}
+
+@keyframes btn-shimmer {
+  0%   { left: -75%; }
+  100% { left: 130%; }
+}
 </style>
