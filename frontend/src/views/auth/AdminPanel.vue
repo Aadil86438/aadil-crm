@@ -103,6 +103,13 @@
                 {{ logStats.total_files }} files
               </v-chip>
             </v-tab>
+            <v-tab value="ai">
+              <v-icon left small color="purple accent-2">mdi-creation</v-icon>
+              AI Copilot (RAG)
+              <v-chip size="x-small" color="purple lighten-5" class="ml-2 font-weight-bold text-caption purple--text" label>
+                Gemini 1.5
+              </v-chip>
+            </v-tab>
           </v-tabs>
         </v-card>
 
@@ -1238,6 +1245,241 @@
             </v-card>
           </v-dialog>
         </div>
+
+        <!-- VIEW 5: AI COPILOT & VECTOR DATABASE (RAG) -->
+        <div v-else-if="currentView === 4" class="ai-copilot-view">
+          <!-- Architecture & Vector Index Status Card -->
+          <v-card class="mb-6 pa-5 ai-banner-card" elevation="0">
+            <div class="d-flex align-center justify-space-between flex-wrap" style="gap: 16px">
+              <div class="d-flex align-center">
+                <v-avatar color="deep-purple darken-3" size="52" class="mr-4 ai-avatar-glow">
+                  <v-icon color="white" size="30">mdi-creation</v-icon>
+                </v-avatar>
+                <div>
+                  <div class="d-flex align-center flex-wrap" style="gap: 8px">
+                    <span class="text-h6 font-weight-black white--text">AI Copilot & Vector Database</span>
+                    <v-chip color="purple lighten-4" small class="purple--text text--darken-4 font-weight-black" label>
+                      <v-icon left x-small color="purple darken-4">mdi-lightning-bolt</v-icon>
+                      GEMINI 1.5 FLASH (FREE)
+                    </v-chip>
+                    <v-chip color="teal lighten-4" small class="teal--text text--darken-4 font-weight-black" label>
+                      <v-icon left x-small color="teal darken-4">mdi-database-search</v-icon>
+                      PGVECTOR ON AWS
+                    </v-chip>
+                  </div>
+                  <div class="text-body-2 grey--text text--lighten-2 mt-1">
+                    Retrieval-Augmented Generation (RAG) over live PostgreSQL CRM records · 768-dim vectors
+                  </div>
+                </div>
+              </div>
+
+              <!-- Action buttons -->
+              <div class="d-flex align-center flex-wrap" style="gap: 10px">
+                <v-btn
+                  color="purple accent-3"
+                  dark
+                  small
+                  class="font-weight-bold px-4 rounded-lg"
+                  :loading="aiSyncing"
+                  @click="syncAIKnowledgeBase"
+                >
+                  <v-icon left small>mdi-database-sync</v-icon>
+                  Sync CRM Data into pgvector
+                </v-btn>
+                <v-btn
+                  color="blue-grey darken-3"
+                  dark
+                  small
+                  outlined
+                  class="font-weight-bold px-3 rounded-lg"
+                  :loading="aiStats.loading"
+                  @click="fetchAIStatus"
+                >
+                  <v-icon left small>mdi-refresh</v-icon>
+                  Check Index
+                </v-btn>
+              </div>
+            </div>
+
+            <!-- Vector Stats Row -->
+            <v-divider class="my-4" style="border-color: rgba(255,255,255,0.12)"></v-divider>
+            <v-row dense class="text-caption">
+              <v-col cols="6" sm="3">
+                <div class="grey--text text--lighten-1">TOTAL VECTORS INDEXED</div>
+                <div class="text-h6 font-weight-bold white--text">{{ aiStats.total || 0 }} chunks</div>
+              </v-col>
+              <v-col cols="6" sm="3">
+                <div class="grey--text text--lighten-1">VECTOR DIMENSIONS</div>
+                <div class="text-h6 font-weight-bold white--text">768 dims (Cosine)</div>
+              </v-col>
+              <v-col cols="6" sm="3">
+                <div class="grey--text text--lighten-1">EMBEDDING MODEL</div>
+                <div class="text-h6 font-weight-bold white--text">text-embedding-004</div>
+              </v-col>
+              <v-col cols="6" sm="3">
+                <div class="grey--text text--lighten-1">STATUS</div>
+                <div class="text-h6 font-weight-bold success--text">
+                  <v-icon x-small color="success" class="mr-1">mdi-circle</v-icon>Ready for Queries
+                </div>
+              </v-col>
+            </v-row>
+          </v-card>
+
+          <!-- Main Chat Card -->
+          <v-card class="ai-chat-card elevation-0" style="border-radius: 16px; border: 1px solid #E2E8F0; overflow: hidden;">
+            <!-- Chat Toolbar -->
+            <div class="ai-chat-header px-5 py-3 d-flex align-center justify-space-between" style="background: #0F172A; border-bottom: 1px solid #1E293B;">
+              <div class="d-flex align-center">
+                <v-icon color="purple accent-2" class="mr-2">mdi-robot-outline</v-icon>
+                <span class="font-weight-bold white--text text-subtitle-2">Proprietor CRM AI Assistant</span>
+                <span class="ml-2 grey--text text--lighten-1 caption hidden-xs-only">— grounded in your live database</span>
+              </div>
+              <div class="d-flex align-center" style="gap: 8px">
+                <!-- Filter selector -->
+                <v-chip-group v-model="aiFilterType" mandatory active-class="purple accent-4 white--text">
+                  <v-chip value="all" filter size="small" class="caption">All Data</v-chip>
+                  <v-chip value="user" filter size="small" class="caption">Users</v-chip>
+                  <v-chip value="audit_log" filter size="small" class="caption">Audit Logs</v-chip>
+                </v-chip-group>
+                <v-btn icon dark small @click="clearAIChat" title="Clear Chat">
+                  <v-icon small color="grey lighten-1">mdi-delete-sweep-outline</v-icon>
+                </v-btn>
+              </div>
+            </div>
+
+            <!-- Quick Questions Carousel / Chips -->
+            <div class="px-5 py-2" style="background: #1E293B; border-bottom: 1px solid #334155;">
+              <div class="d-flex align-center flex-wrap" style="gap: 8px">
+                <span class="caption grey--text text--lighten-2 font-weight-medium">Suggestions:</span>
+                <v-chip
+                  v-for="(q, qIdx) in aiQuickQuestions"
+                  :key="qIdx"
+                  x-small
+                  outlined
+                  color="purple lighten-4"
+                  class="cursor-pointer quick-prompt-chip"
+                  @click="sendAIMessage(q)"
+                >
+                  <v-icon left x-small color="purple accent-2">mdi-sparkles</v-icon>
+                  {{ q }}
+                </v-chip>
+              </div>
+            </div>
+
+            <!-- Chat Message History Container -->
+            <div ref="aiChatContainer" class="ai-messages-container pa-5" style="background: #0B0F19; min-height: 420px; max-height: 560px; overflow-y: auto;">
+              <div v-for="(msg, mIdx) in aiMessages" :key="mIdx" class="mb-5 d-flex" :class="msg.role === 'user' ? 'justify-end' : 'justify-start'">
+                <!-- Assistant Avatar -->
+                <v-avatar v-if="msg.role === 'assistant'" size="36" color="deep-purple darken-3" class="mr-3 mt-1 flex-shrink-0">
+                  <v-icon small color="white">mdi-creation</v-icon>
+                </v-avatar>
+
+                <!-- Message Content Bubble -->
+                <div :class="msg.role === 'user' ? 'ai-bubble-user' : 'ai-bubble-bot'" style="max-width: 82%;">
+                  <div class="d-flex align-center justify-space-between mb-1">
+                    <span class="caption font-weight-bold" :class="msg.role === 'user' ? 'indigo--text text--lighten-4' : 'purple--text text--lighten-4'">
+                      {{ msg.role === 'user' ? 'You' : 'Gemini 1.5 Flash' }}
+                    </span>
+                    <span class="caption grey--text ml-3">{{ msg.time }}</span>
+                  </div>
+
+                  <!-- Text Body with whitespace preservation -->
+                  <div class="ai-msg-body white--text text-body-2" style="white-space: pre-wrap; line-height: 1.6;">{{ msg.content }}</div>
+
+                  <!-- Retrieved Chunks Evidence Expander (RAG visualization) -->
+                  <div v-if="msg.chunks && msg.chunks.length > 0" class="mt-3 pt-2" style="border-top: 1px solid rgba(255,255,255,0.1);">
+                    <div
+                      class="d-flex align-center cursor-pointer text-caption purple--text text--lighten-3 font-weight-bold"
+                      @click="msg.expandedChunks = !msg.expandedChunks"
+                    >
+                      <v-icon x-small color="purple accent-2" class="mr-1">mdi-database-search</v-icon>
+                      <span>{{ msg.chunks.length }} Source Chunks Retrieved from pgvector (Cosine Search)</span>
+                      <v-icon x-small color="purple accent-2" class="ml-1">
+                        {{ msg.expandedChunks ? 'mdi-chevron-up' : 'mdi-chevron-down' }}
+                      </v-icon>
+                      <span v-if="msg.latency" class="ml-auto grey--text text-caption">{{ msg.latency }}ms latency</span>
+                    </div>
+
+                    <!-- Expandable chunk details -->
+                    <v-expand-transition>
+                      <div v-show="msg.expandedChunks" class="mt-2" style="display: flex; flex-direction: column; gap: 8px;">
+                        <div
+                          v-for="(chunk, cIdx) in msg.chunks"
+                          :key="cIdx"
+                          class="pa-2 rounded"
+                          style="background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); font-size: 11px;"
+                        >
+                          <div class="d-flex align-center justify-space-between mb-1">
+                            <v-chip x-small color="purple darken-2" dark class="font-weight-bold">
+                              {{ (chunk.source_type || 'CRM').toUpperCase() }}
+                            </v-chip>
+                            <span class="success--text font-weight-bold" v-if="chunk.score">
+                              {{ Math.round(chunk.score * 100) }}% similarity
+                            </span>
+                          </div>
+                          <div class="grey--text text--lighten-2">{{ chunk.content }}</div>
+                        </div>
+                      </div>
+                    </v-expand-transition>
+                  </div>
+                </div>
+
+                <!-- User Avatar -->
+                <v-avatar v-if="msg.role === 'user'" size="36" color="indigo darken-2" class="ml-3 mt-1 flex-shrink-0">
+                  <v-icon small color="white">mdi-account</v-icon>
+                </v-avatar>
+              </div>
+
+              <!-- Loading Indicator while AI generates -->
+              <div v-if="aiSending" class="d-flex justify-start align-center mb-4">
+                <v-avatar size="36" color="deep-purple darken-3" class="mr-3 flex-shrink-0">
+                  <v-icon small color="white">mdi-creation</v-icon>
+                </v-avatar>
+                <div class="ai-bubble-bot pa-3 d-flex align-center" style="gap: 10px;">
+                  <v-progress-circular indeterminate size="18" width="2" color="purple accent-2"></v-progress-circular>
+                  <span class="caption grey--text text--lighten-2 font-weight-medium">
+                    Searching pgvector embeddings & synthesizing answer with Gemini 1.5 Flash...
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Input Bar -->
+            <div class="pa-4" style="background: #0F172A; border-top: 1px solid #1E293B;">
+              <div class="d-flex align-center" style="gap: 12px">
+                <v-text-field
+                  v-model="aiInputMessage"
+                  placeholder="Ask a question about your CRM database (e.g. 'How many users are pending approval?')..."
+                  outlined
+                  dense
+                  hide-details
+                  dark
+                  color="purple accent-2"
+                  class="ai-input-field rounded-lg"
+                  @keydown.enter.prevent="sendAIMessage()"
+                  :disabled="aiSending"
+                ></v-text-field>
+
+                <v-btn
+                  color="purple accent-3"
+                  dark
+                  class="font-weight-bold rounded-lg px-5"
+                  style="height: 40px"
+                  :loading="aiSending"
+                  :disabled="!aiInputMessage || !aiInputMessage.trim()"
+                  @click="sendAIMessage()"
+                >
+                  <v-icon left small>mdi-send</v-icon>
+                  Send
+                </v-btn>
+              </div>
+              <div class="caption grey--text mt-2 d-flex align-center justify-space-between">
+                <span>⚡ Free Tier Quota: 15 RPM · 1 Million tokens/day · 100% Free</span>
+                <span>Press <strong>Enter</strong> to send</span>
+              </div>
+            </div>
+          </v-card>
+        </div>
       </div>
 
       <!-- Notification Snackbar -->
@@ -1352,6 +1594,35 @@ export default {
         { text: 'REGISTRATION DATE', value: 'created_at', sortable: true },
         { text: 'STATUS', value: 'approval_status', sortable: true, align: 'center' },
         { text: 'ACTIONS', value: 'actions', sortable: false, align: 'end' }
+      ],
+      // AI Copilot & pgvector Knowledge Base state
+      aiStats: {
+        total: 0,
+        by_type: {},
+        vector_dims: 768,
+        model: 'gemini-text-embedding-004',
+        connected: false,
+        loading: false
+      },
+      aiMessages: [
+        {
+          role: 'assistant',
+          content: 'Hello! I am your Proprietor CRM AI Copilot powered by Google Gemini 1.5 Flash and pgvector on AWS RDS.\n\nI have direct semantic access to your users, registrations, and audit logs. How can I help you today?',
+          chunks: [],
+          latency: null,
+          time: new Date().toLocaleTimeString(),
+          expandedChunks: false
+        }
+      ],
+      aiInputMessage: '',
+      aiSending: false,
+      aiSyncing: false,
+      aiFilterType: 'all',
+      aiQuickQuestions: [
+        'How many pending user registrations do we have?',
+        'Show summary of users approved this week',
+        'Check audit logs for suspicious activity',
+        'List all sales managers and companies'
       ]
     }
   },
@@ -1364,6 +1635,9 @@ export default {
       } else if (val === 3) {
         this.fetchLogFiles()
         this.startLiveLogStream()
+      } else if (val === 4) {
+        this.stopLiveLogStream()
+        this.fetchAIStatus()
       } else {
         this.stopLiveLogStream()
       }
@@ -1965,6 +2239,116 @@ export default {
       if (status.startsWith('4')) return '#F59E0B'
       if (status.startsWith('5')) return '#EF4444'
       return '#6B7280'
+    },
+    // ─── AI Copilot & pgvector Methods ────────────────────────────
+    async fetchAIStatus() {
+      this.aiStats.loading = true
+      try {
+        const res = await registrationService.getAIStatus(this.adminToken)
+        if (res && res.data) {
+          const d = res.data.data || res.data
+          this.aiStats.total = d.total || 0
+          this.aiStats.by_type = d.by_type || {}
+          this.aiStats.connected = true
+        }
+      } catch (err) {
+        console.error('Failed to get AI status:', err)
+        this.aiStats.connected = false
+      } finally {
+        this.aiStats.loading = false
+      }
+    },
+    async syncAIKnowledgeBase() {
+      this.aiSyncing = true
+      try {
+        const res = await registrationService.syncAIEmbeddings(this.adminToken)
+        const d = res.data?.data || res.data || {}
+        this.snackbarText = `AI Sync Successful: ${d.synced || 0} CRM records vectorized into AWS pgvector!`
+        this.snackbarColor = 'success'
+        this.snackbar = true
+        await this.fetchAIStatus()
+      } catch (err) {
+        console.error('Failed to sync AI embeddings:', err)
+        this.snackbarText = 'AI Sync failed: ' + (err.response?.data?.message || err.message)
+        this.snackbarColor = 'error'
+        this.snackbar = true
+      } finally {
+        this.aiSyncing = false
+      }
+    },
+    async sendAIMessage(presetText = null) {
+      const text = (presetText || this.aiInputMessage || '').trim()
+      if (!text || this.aiSending) return
+
+      this.aiInputMessage = ''
+      const userMsg = {
+        role: 'user',
+        content: text,
+        time: new Date().toLocaleTimeString()
+      }
+      this.aiMessages.push(userMsg)
+      this.aiSending = true
+
+      this.$nextTick(() => {
+        this.scrollAIChatToBottom()
+      })
+
+      const history = this.aiMessages
+        .filter(m => m.role === 'user' || m.role === 'assistant')
+        .slice(-6)
+        .map(m => ({ role: m.role, content: m.content }))
+
+      const sourceTypes = this.aiFilterType === 'all' ? null : [this.aiFilterType]
+
+      try {
+        const res = await registrationService.askAICopilot({
+          message: text,
+          source_types: sourceTypes,
+          top_k: 5,
+          history: history
+        }, this.adminToken)
+
+        const d = res.data?.data || res.data || {}
+        this.aiMessages.push({
+          role: 'assistant',
+          content: d.answer || 'No response generated.',
+          chunks: d.chunks || [],
+          latency: d.latency_ms || null,
+          time: new Date().toLocaleTimeString(),
+          expandedChunks: false
+        })
+      } catch (err) {
+        console.error('AI chat failed:', err)
+        const errMsg = err.response?.data?.message || err.response?.data?.error || err.message || 'Request failed'
+        this.aiMessages.push({
+          role: 'assistant',
+          content: `⚠️ AI Request Failed: ${errMsg}\nMake sure GEMINI_API_KEY is configured in your services/admin-service-gcp/.env file.`,
+          chunks: [],
+          latency: null,
+          time: new Date().toLocaleTimeString()
+        })
+      } finally {
+        this.aiSending = false
+        this.$nextTick(() => {
+          this.scrollAIChatToBottom()
+        })
+      }
+    },
+    scrollAIChatToBottom() {
+      const container = this.$refs.aiChatContainer
+      if (container) {
+        container.scrollTop = container.scrollHeight
+      }
+    },
+    clearAIChat() {
+      this.aiMessages = [
+        {
+          role: 'assistant',
+          content: 'Chat cleared. How can I assist you with your CRM database?',
+          chunks: [],
+          time: new Date().toLocaleTimeString()
+        }
+      ]
     }
   }
 }
@@ -2584,5 +2968,59 @@ export default {
 @keyframes btn-shimmer {
   0%   { left: -75%; }
   100% { left: 130%; }
+}
+
+/* ─── AI COPILOT & RAG WORKSPACE STYLES ─────────────────────────────────────── */
+.ai-banner-card {
+  background: linear-gradient(135deg, #1E1B4B 0%, #0F172A 70%, #030712 100%) !important;
+  border: 1px solid rgba(168, 85, 247, 0.35) !important;
+  border-radius: 20px !important;
+  box-shadow: 0 12px 40px rgba(168, 85, 247, 0.15), 0 4px 12px rgba(0,0,0,0.4) !important;
+}
+
+.ai-avatar-glow {
+  box-shadow: 0 0 24px rgba(168, 85, 247, 0.55);
+}
+
+.ai-bubble-user {
+  background: linear-gradient(135deg, #1E293B, #0F172A);
+  border: 1px solid rgba(99, 102, 241, 0.4);
+  border-radius: 18px 18px 4px 18px;
+  padding: 12px 18px;
+  box-shadow: 0 4px 14px rgba(0,0,0,0.25);
+}
+
+.ai-bubble-bot {
+  background: linear-gradient(135deg, #131B2E, #0F172A);
+  border: 1px solid rgba(168, 85, 247, 0.3);
+  border-radius: 18px 18px 18px 4px;
+  padding: 14px 18px;
+  box-shadow: 0 4px 16px rgba(168, 85, 247, 0.1);
+}
+
+.quick-prompt-chip {
+  background: rgba(168, 85, 247, 0.08) !important;
+  border-color: rgba(168, 85, 247, 0.3) !important;
+  transition: all 0.2s ease;
+}
+
+.quick-prompt-chip:hover {
+  background: rgba(168, 85, 247, 0.2) !important;
+  border-color: rgba(168, 85, 247, 0.7) !important;
+  transform: translateY(-1px);
+}
+
+.ai-messages-container::-webkit-scrollbar {
+  width: 6px;
+}
+.ai-messages-container::-webkit-scrollbar-track {
+  background: #0B0F19;
+}
+.ai-messages-container::-webkit-scrollbar-thumb {
+  background: #334155;
+  border-radius: 3px;
+}
+.ai-messages-container::-webkit-scrollbar-thumb:hover {
+  background: #64748B;
 }
 </style>

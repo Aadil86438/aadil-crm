@@ -20,6 +20,7 @@ func Setup(cfg *config.Config) http.Handler {
 	activityRepo := repositories.NewActivityRepository(database.DB)
 	noteRepo := repositories.NewNoteRepository(database.DB)
 	auditRepo := repositories.NewAuditRepository(database.DB)
+	aiRepo := repositories.NewAIRepository(database.DB)
 
 	// Initialize handlers
 	authH := handlers.NewAuthHandler(userRepo, auditRepo)
@@ -30,6 +31,7 @@ func Setup(cfg *config.Config) http.Handler {
 	dashboardH := handlers.NewDashboardHandler(taskRepo, activityRepo)
 	userH := handlers.NewUserHandler(userRepo, auditRepo, cfg)
 	auditH := handlers.NewAuditHandler(auditRepo)
+	aiH := handlers.NewAIHandler(aiRepo)
 
 	mux := http.NewServeMux()
 
@@ -91,6 +93,36 @@ func Setup(cfg *config.Config) http.Handler {
 	mux.Handle("/internal/logs/live", middleware.InternalServiceAuth(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodGet {
 			middleware.LiveLogsStreamHandler(w, r)
+		} else {
+			http.NotFound(w, r)
+		}
+	})))
+
+	// ─── AI / VECTOR SEARCH (called by admin-service-gcp AI chat) ─────────
+	mux.Handle("/internal/ai/search", middleware.InternalServiceAuth(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodPost {
+			aiH.Search(w, r)
+		} else {
+			http.NotFound(w, r)
+		}
+	})))
+	mux.Handle("/internal/ai/embed", middleware.InternalServiceAuth(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodPost {
+			aiH.Embed(w, r)
+		} else {
+			http.NotFound(w, r)
+		}
+	})))
+	mux.Handle("/internal/ai/status", middleware.InternalServiceAuth(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet {
+			aiH.Status(w, r)
+		} else {
+			http.NotFound(w, r)
+		}
+	})))
+	mux.Handle("/internal/ai/sync", middleware.InternalServiceAuth(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodPost {
+			aiH.Sync(w, r)
 		} else {
 			http.NotFound(w, r)
 		}

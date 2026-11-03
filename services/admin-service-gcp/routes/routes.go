@@ -30,6 +30,7 @@ func Setup(cfg *config.Config) http.Handler {
 	coreStatsH := handlers.NewCoreStatsHandler(core)
 	coreAuditH := handlers.NewCoreAuditHandler(core)
 	coreUsersH := handlers.NewCoreUsersHandler(core)
+	aiChatH := handlers.NewAIChatHandler(core)
 
 	// ── Redis (connected to the same Redis as AWS, or GCP-local Redis) ────────
 	_ = database.RedisClient // already initialized in main.go
@@ -139,6 +140,29 @@ func Setup(cfg *config.Config) http.Handler {
 	mux.Handle("/api/admin/core/users", adminAuth(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodGet {
 			coreUsersH.List(w, r)
+		}
+	})))
+
+	// ─── AI / RAG CHAT ROUTES ────────────────────────────────────────────────
+	mux.Handle("/api/admin/ai/chat", adminAuth(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodPost {
+			aiChatH.Chat(w, r)
+		} else {
+			http.NotFound(w, r)
+		}
+	})))
+	mux.Handle("/api/admin/ai/status", adminAuth(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet {
+			aiChatH.Status(w, r)
+		} else {
+			http.NotFound(w, r)
+		}
+	})))
+	mux.Handle("/api/admin/ai/sync", adminAuth(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodPost {
+			aiChatH.Sync(w, r)
+		} else {
+			http.NotFound(w, r)
 		}
 	})))
 

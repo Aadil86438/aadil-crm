@@ -84,6 +84,23 @@ export default {
     return `${adminBaseURL}/api/admin/logs/download?date=${date}`
   },
 
+  // AI Copilot & pgvector Knowledge Base (Gemini 1.5 Flash + pgvector)
+  askAICopilot(data, token) {
+    return axios.post(`${adminBaseURL}/api/admin/ai/chat`, data, {
+      headers: { Authorization: `Bearer ${token}` }
+    })
+  },
+  getAIStatus(token) {
+    return axios.get(`${adminBaseURL}/api/admin/ai/status`, {
+      headers: { Authorization: `Bearer ${token}` }
+    })
+  },
+  syncAIEmbeddings(token) {
+    return axios.post(`${adminBaseURL}/api/admin/ai/sync`, {}, {
+      headers: { Authorization: `Bearer ${token}` }
+    })
+  },
+
   // User Approval & Rejection (calls admin proxy with fallback to core service)
   async approveUser(id, token) {
     try {
